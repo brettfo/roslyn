@@ -321,6 +321,100 @@ Call New Integer.ToString()
             Await TestAsync(code, expected, compareTokens:=False)
         End Function
 
+        <WorkItem(1017, "https://github.com/dotnet/roslyn/issues/1017")>
+        <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsInlineTemporary)>
+        Public Sub MultipleDeclaratorsWithTrivia1()
+            Dim code =
+<MethodBody>
+' comment dim
+Dim [||]a = 1, ' comment a
+    b = 1 ' comment b
+Dim x = a ' comment x
+</MethodBody>
+
+            Dim expected =
+<MethodBody>
+' comment dim
+' comment a
+Dim b = 1 ' comment b
+Dim x = 1 ' comment x
+</MethodBody>
+
+            Test(code, expected, compareTokens:=False)
+        End Sub
+
+        <WorkItem(1017, "https://github.com/dotnet/roslyn/issues/1017")>
+        <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsInlineTemporary)>
+        Public Sub MultipleDeclaratorsWithTrivia2()
+            Dim code =
+<MethodBody>
+' comment dim
+Dim [||]a = 1, ' comment a
+    b = 1, ' comment b
+    c = 1 ' comment c
+Dim x = a ' comment x
+</MethodBody>
+
+            Dim expected =
+<MethodBody>
+' comment dim
+' comment a
+Dim b = 1, ' comment b
+    c = 1 ' comment c
+Dim x = 1 ' comment x
+</MethodBody>
+
+            Test(code, expected, compareTokens:=False)
+        End Sub
+
+        <WorkItem(1017, "https://github.com/dotnet/roslyn/issues/1017")>
+        <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsInlineTemporary)>
+        Public Sub MultipleDeclaratorsWithTrivia3()
+            Dim code =
+<MethodBody>
+' comment dim
+Dim a = 1, ' comment a
+    [||]b = 1, ' comment b
+    c = 1 ' comment c
+Dim x = b ' comment x
+</MethodBody>
+
+            Dim expected =
+<MethodBody>
+' comment dim
+' comment b
+Dim a = 1, ' comment a
+    c = 1 ' comment c
+Dim x = 1 ' comment x
+</MethodBody>
+
+            Test(code, expected, compareTokens:=False)
+        End Sub
+
+        <WorkItem(1017, "https://github.com/dotnet/roslyn/issues/1017")>
+        <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsInlineTemporary)>
+        Public Sub MultipleDeclaratorsWithTrivia4()
+            Dim code =
+<MethodBody>
+' comment dim
+Dim a = 1, ' comment a
+    b = 1, ' comment b
+    [||]c = 1 ' comment c
+Dim x = c ' comment x
+</MethodBody>
+
+            Dim expected =
+<MethodBody>
+' comment dim
+' comment c
+Dim a = 1, ' comment a
+    b = 1 ' comment b
+Dim x = 1 ' comment x
+</MethodBody>
+
+            Test(code, expected, compareTokens:=False)
+        End Sub
+
         <WorkItem(16601, "DevDiv_Projects/Roslyn")>
         <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsInlineTemporary)>
         Public Async Function TestInlineIntoNextDeclarator() As Task

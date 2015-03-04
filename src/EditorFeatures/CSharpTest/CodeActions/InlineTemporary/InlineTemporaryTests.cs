@@ -86,6 +86,243 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.CodeRefactorings.Inline
             await TestMissingAsync(GetTreeText(@"{ int x = 0, y = 1, [||]z = 2; }"));
         }
 
+        [WorkItem(1017, "https://github.com/dotnet/roslyn/issues/1017")]
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsInlineTemporary)]
+        public void MultipleDeclaratorsWithTrivia1()
+        {
+            var code = @"
+class C
+{
+    void M()
+    {
+        // comment int
+        int [||]a = 1, // comment a
+            b = 1; // comment b
+        int x = a; // comment x
+    }
+}
+";
+
+            var expected = @"
+class C
+{
+    void M()
+    {
+        // comment int
+        // comment a
+        int b = 1; // comment b
+        int x = 1; // comment x
+    }
+}
+";
+
+            Test(code, expected, compareTokens: false);
+        }
+
+        [WorkItem(1017, "https://github.com/dotnet/roslyn/issues/1017")]
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsInlineTemporary)]
+        public void MultipleDeclaratorsWithTrivia2()
+        {
+            var code = @"
+class C
+{
+    void M()
+    {
+        // comment int
+        int [||]a = 1, // comment a
+            b = 1, // comment b
+            c = 1; // comment c
+        int x = a; // comment x
+    }
+}
+";
+
+            var expected = @"
+class C
+{
+    void M()
+    {
+        // comment int
+        // comment a
+        int b = 1, // comment b
+            c = 1; // comment c
+        int x = 1; // comment x
+    }
+}
+";
+
+            Test(code, expected, compareTokens: false);
+        }
+
+        [WorkItem(1017, "https://github.com/dotnet/roslyn/issues/1017")]
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsInlineTemporary)]
+        public void MultipleDeclaratorsWithTrivia3()
+        {
+            var code = @"
+class C
+{
+    void M()
+    {
+        // comment int
+        int a = 1, // comment a
+            [||]b = 1, // comment b
+            c = 1; // comment c
+        int x = b; // comment x
+    }
+}
+";
+
+            var expected = @"
+class C
+{
+    void M()
+    {
+        // comment int
+        // comment b
+        int a = 1, // comment a
+            c = 1; // comment c
+        int x = 1; // comment x
+    }
+}
+";
+
+            Test(code, expected, compareTokens: false);
+        }
+
+        [WorkItem(1017, "https://github.com/dotnet/roslyn/issues/1017")]
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsInlineTemporary)]
+        public void MultipleDeclaratorsWithTrivia4()
+        {
+            var code = @"
+class C
+{
+    void M()
+    {
+        // comment int
+        int a = 1, // comment a
+            b = 1, // comment b
+            [||]c = 1; // comment c
+        int x = c; // comment x
+    }
+]
+";
+
+            var expected = @"
+class C
+{
+    void M()
+    {
+        // comment int
+        // comment c
+        int a = 1, // comment a
+            b = 1; // comment b
+        int x = 1; // comment x
+    }
+}
+";
+
+            Test(code, expected, compareTokens: false);
+        }
+
+        [WorkItem(1017, "https://github.com/dotnet/roslyn/issues/1017")]
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsInlineTemporary)]
+        public void MultipleDeclaratorsWithTrivia5()
+        {
+            var code = @"
+class C
+{
+    void M()
+    {
+        // comment int
+        int /* a lead */ [||]a = 1 /* a trail*/, /* b lead */ b = 1 /* b trail */, /* c lead */ c = 1 /* c trail */; // trail
+        int x = a; // comment x
+    }
+]
+";
+
+            var expected = @"
+class C
+{
+    void M()
+    {
+        // comment int
+        /* a lead */
+        /* a trail */
+        int /* b lead */ b = 1 /* b trail */, /* c lead */ c = 1 /* c trail */; // trail
+        int x = 1; // comment x
+    }
+}
+";
+
+            Test(code, expected, compareTokens: false);
+        }
+
+        [WorkItem(1017, "https://github.com/dotnet/roslyn/issues/1017")]
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsInlineTemporary)]
+        public void MultipleDeclaratorsWithTrivia6()
+        {
+            var code = @"
+class C
+{
+    void M()
+    {
+        // comment int
+        int /* a lead */ a = 1 /* a trail*/, /* b lead */ [||]b = 1 /* b trail */, /* c lead */ c = 1 /* c trail */; // trail
+        int x = b; // comment x
+    }
+]
+";
+
+            var expected = @"
+class C
+{
+    void M()
+    {
+        // comment int
+        /* b lead */
+        /* b trail */
+        int /* a lead */ a = 1 /* a trail */, /* c lead */ c = 1 /* c trail */; // trail
+        int x = 1; // comment x
+    }
+}
+";
+
+            Test(code, expected, compareTokens: false);
+        }
+
+        [WorkItem(1017, "https://github.com/dotnet/roslyn/issues/1017")]
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsInlineTemporary)]
+        public void MultipleDeclaratorsWithTrivia7()
+        {
+            var code = @"
+class C
+{
+    void M()
+    {
+        // comment int
+        int /* a lead */ a = 1 /* a trail*/, /* b lead */ b = 1 /* b trail */, /* c lead */ [||]c = 1 /* c trail */; // trail
+        int x = c; // comment x
+    }
+]
+";
+
+            var expected = @"
+class C
+{
+    void M()
+    {
+        // comment int
+        /* c lead */
+        /* c trail */
+        int /* a lead */ a = 1 /* a trail */, /* b lead */ b = 1 /* b trail */; // trail
+        int x = 1; // comment x
+    }
+}
+";
+
+            Test(code, expected, compareTokens: false);
+        }
+
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsInlineTemporary)]
         public async Task Escaping1()
         {
