@@ -331,6 +331,7 @@
     <Compile Include="OrganizeImports\CSharpOrganizeImportsService.Rewriter.cs" />
     <Compile Include="Organizing\CSharpOrganizingService.cs" />
     <Compile Include="Organizing\CSharpOrganizingService.Rewriter.cs" />
+    <Compile Include="Organizing\CSharpTriviaLogicalOwnershipAssignmentService.cs" />
     <Compile Include="Organizing\Organizers\ClassDeclarationOrganizer.cs" />
     <Compile Include="Organizing\Organizers\ConstructorDeclarationOrganizer.cs" />
     <Compile Include="Organizing\Organizers\DestructorDeclarationOrganizer.cs" />

@@ -245,6 +245,7 @@
     <Compile Include="LanguageServices\ProjectInfoService\IProjectInfoService.cs" />
     <Compile Include="Navigation\NavigationOptions.cs" />
     <Compile Include="Navigation\NavigationOptionsProvider.cs" />
+    <Compile Include="Organizing\ITriviaLogicalOwnershipAssignmentService.cs" />
     <Compile Include="QuickInfo\QuickInfoUtilities.cs" />
     <Compile Include="RemoveUnnecessaryImports\AbstractRemoveUnnecessaryImportsService.cs" />
     <Compile Include="ReplaceMethodWithProperty\ReplaceMethodWithPropertyCodeRefactoringProvider.cs" />

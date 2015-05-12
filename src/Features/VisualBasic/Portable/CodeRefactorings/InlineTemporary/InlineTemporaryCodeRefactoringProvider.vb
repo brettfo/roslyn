@@ -7,9 +7,11 @@ Imports Microsoft.CodeAnalysis.CodeActions
 Imports Microsoft.CodeAnalysis.CodeRefactorings
 Imports Microsoft.CodeAnalysis.FindSymbols
 Imports Microsoft.CodeAnalysis.Formatting
+Imports Microsoft.CodeAnalysis.Organizing
 Imports Microsoft.CodeAnalysis.Simplification
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic
+Imports Microsoft.CodeAnalysis.VisualBasic.Organizing
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 Imports Microsoft.CodeAnalysis.VisualBasic.Utilities
 
@@ -17,6 +19,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeRefactorings.InlineTemporary
     <ExportCodeRefactoringProvider(LanguageNames.VisualBasic, Name:=PredefinedCodeRefactoringProviderNames.InlineTemporary), [Shared]>
     Partial Friend Class InlineTemporaryCodeRefactoringProvider
         Inherits CodeRefactoringProvider
+
+        Private ReadOnly _triviaAssignmentService As ITriviaLogicalOwnershipAssignmentService = New VisualBasicTriviaLogicalOwnershipAssignmentService()
 
         Public Overloads Overrides Async Function ComputeRefactoringsAsync(context As CodeRefactoringContext) As Task
             Dim document = context.Document
@@ -284,45 +288,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeRefactorings.InlineTemporary
             Dim localDeclaration = DirectCast(variableDeclarator.Parent, LocalDeclarationStatementSyntax)
 
             If localDeclaration.Declarators.Count > 1 And variableDeclarator.Names.Count = 1 Then
-                Dim newLocalDeclaration = localDeclaration.RemoveNode(variableDeclarator, SyntaxRemoveOptions.KeepNoTrivia)
-
-                ' preserve any trailing comments on the declaration being removed
-                Dim declarationIndex = localDeclaration.Declarators.TakeWhile(Function(v) Not v.Equals(variableDeclarator)).Count()
-                Dim isLastDeclaration = declarationIndex = localDeclaration.Declarators.Count - 1
-                Dim declarationTrailingTrivia = If(isLastDeclaration,
-                    localDeclaration.Declarators(declarationIndex).GetTrailingTrivia(), ' last declarator, comment on declarator itself
-                    localDeclaration.Declarators.GetSeparator(declarationIndex).TrailingTrivia) ' first/medial declarator, comment on separator
-
-                ' promote the comments (if any) to the LocalDeclarationSyntax
-                If declarationTrailingTrivia.Any(Function(t) t.Kind() = SyntaxKind.CommentTrivia) Then
-                    newLocalDeclaration = newLocalDeclaration _
-                        .WithLeadingTrivia(newLocalDeclaration.GetLeadingTrivia().AddRange(declarationTrailingTrivia))
-                End If
-
-                ' ensure the correct trailing trivia on the remaining declarators
-                If declarationIndex > 0 Then
-                    ' get the previous separator's trailing trivia
-                    Dim separatorTrivia = localDeclaration.Declarators.GetSeparator(declarationIndex - 1).TrailingTrivia
-                    If separatorTrivia.Any(Function(t) t.Kind() = SyntaxKind.CommentTrivia) Then
-                        If isLastDeclaration Then
-                            ' the previous separator's trailing trivia becomes the new statement's trailing trivia
-                            newLocalDeclaration = newLocalDeclaration.WithTrailingTrivia(separatorTrivia)
-                        Else
-                            ' correct the previous separator's trailing trivia
-                            Dim oldPreviousSeparator = localDeclaration.Declarators.GetSeparator(declarationIndex - 1)
-                            Dim separatorToReplace = newLocalDeclaration.Declarators.GetSeparator(declarationIndex - 1)
-                            newLocalDeclaration = newLocalDeclaration.ReplaceToken(separatorToReplace, separatorToReplace.WithTrailingTrivia(oldPreviousSeparator.TrailingTrivia))
-                        End If
-                    End If
-                End If
-
-                ' ensure there is a newline at the very end
-                Dim trailingTrivia = newLocalDeclaration.GetTrailingTrivia()
-                If trailingTrivia.Count = 0 OrElse Not trailingTrivia.Last().Kind() = SyntaxKind.EndOfLineTrivia Then
-                    newLocalDeclaration = newLocalDeclaration.WithAppendedTrailingTrivia(SyntaxFactory.EndOfLineTrivia(vbCrLf))
-                End If
-
-                Return newLocalDeclaration
+                ' TODO
+                'Dim declarationIndexToRemove = localDeclaration.Declarators.TakeWhile(Function(v) Not v.Equals(variableDeclarator)).Count()
+                'Dim triviaParts = _triviaAssignmentService.AssignTriviaOwnership(Nothing, localDeclaration.Declarators, Nothing).ToArray()
+                'Dim newLocalDeclartion = SyntaxFactory.LocalDeclarationStatement()
+                'Return newLocalDeclartion
             End If
 
             If variableDeclarator.Names.Count > 1 Then
