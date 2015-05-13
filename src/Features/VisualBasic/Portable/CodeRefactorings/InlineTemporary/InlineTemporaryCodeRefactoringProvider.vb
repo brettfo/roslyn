@@ -288,11 +288,55 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeRefactorings.InlineTemporary
             Dim localDeclaration = DirectCast(variableDeclarator.Parent, LocalDeclarationStatementSyntax)
 
             If localDeclaration.Declarators.Count > 1 And variableDeclarator.Names.Count = 1 Then
-                ' TODO
-                'Dim declarationIndexToRemove = localDeclaration.Declarators.TakeWhile(Function(v) Not v.Equals(variableDeclarator)).Count()
-                'Dim triviaParts = _triviaAssignmentService.AssignTriviaOwnership(Nothing, localDeclaration.Declarators, Nothing).ToArray()
-                'Dim newLocalDeclartion = SyntaxFactory.LocalDeclarationStatement()
-                'Return newLocalDeclartion
+                Dim declarationIndexToRemove = localDeclaration.Declarators.TakeWhile(Function(v) Not v.Equals(variableDeclarator)).Count()
+                Dim triviaParts = _triviaAssignmentService.AssignTriviaOwnership(localDeclaration.Modifiers.Single(), localDeclaration.Declarators, Nothing).ToArray()
+
+                ' build new variable declarator list
+                Dim newVariableDeclarators = New List(Of SyntaxNodeOrToken)()
+                For i = 0 To localDeclaration.Declarators.Count - 1
+                    If i = declarationIndexToRemove Then
+                        ' skip the one we're removing for now
+                    Else
+                        ' add the leading trivia
+                        Dim newDeclarator = localDeclaration.Declarators(i).WithLeadingTrivia(triviaParts(i).Item1).WithPrependedLeadingTrivia(SyntaxFactory.ElasticTab)
+                        If i = localDeclaration.Declarators.Count - 1 Then
+                            ' add the trailing trivia directly to the node
+                            newDeclarator = newDeclarator.WithAppendedTrailingTrivia(triviaParts(i).Item2)
+                            newVariableDeclarators.Add(newDeclarator)
+                        Else
+                            ' add separator with the appropriate trailing trivia
+                            newVariableDeclarators.Add(newDeclarator)
+                            newVariableDeclarators.Add(localDeclaration.Declarators.GetSeparator(i).WithTrailingTrivia(triviaParts(i).Item2))
+                        End If
+                    End If
+                Next
+
+                ' if removing the last declarator, promote the last separator's trivia to be trailing on the last declarator and remove it
+                If declarationIndexToRemove = localDeclaration.Declarators.Count - 1 Then
+                    Dim lastSeparator = newVariableDeclarators.Last().AsToken()
+                    newVariableDeclarators.RemoveAt(newVariableDeclarators.Count - 1)
+                    Dim lastDeclarator = newVariableDeclarators.Last().AsNode()
+                    newVariableDeclarators.RemoveAt(newVariableDeclarators.Count - 1)
+                    newVariableDeclarators.Add(lastDeclarator.WithAppendedTrailingTrivia(lastSeparator.LeadingTrivia).WithAppendedTrailingTrivia(lastSeparator.TrailingTrivia))
+                End If
+
+                ' ensure the last item ends with a newline token
+                Dim finalTrailingTrivia = newVariableDeclarators.Last().AsNode().GetTrailingTrivia()
+                If finalTrailingTrivia.Count = 0 OrElse Not finalTrailingTrivia.Last().IsKind(SyntaxKind.EndOfLineTrivia) Then
+                    newVariableDeclarators(newVariableDeclarators.Count - 1) = newVariableDeclarators.Last().AsNode().WithAppendedTrailingTrivia(SyntaxFactory.EndOfLineTrivia(vbCrLf))
+                End If
+
+                Dim newLocalDeclaration = localDeclaration.WithDeclarators(SyntaxFactory.SeparatedList(Of VariableDeclaratorSyntax)(newVariableDeclarators))
+
+                ' add trivia from the removed node to the declaration, unless it's only whitespace
+                Dim newLeadingTrivia = triviaParts(declarationIndexToRemove).Item1.
+                                        Concat(variableDeclarator.GetTrailingTrivia()).
+                                        Concat(triviaParts(declarationIndexToRemove).Item2)
+                If newLeadingTrivia.Any(Function(t) Not t.IsWhitespace()) Then
+                    newLocalDeclaration = newLocalDeclaration.WithLeadingTrivia(newLocalDeclaration.GetLeadingTrivia().Concat(newLeadingTrivia))
+                End If
+
+                Return newLocalDeclaration
             End If
 
             If variableDeclarator.Names.Count > 1 Then

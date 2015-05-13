@@ -12,33 +12,40 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Organizing
 {
     public class TriviaOwnershipAssignmentTests
     {
-        private void Check(string separatedSyntaxList, params Tuple<string, string>[] expectedTrivia)
+        private void Check<T>(SyntaxToken previousToken, SeparatedSyntaxList<T> syntaxList, SyntaxToken nextToken, params Tuple<string, string>[] expectedTrivia) where T : SyntaxNode
         {
-            // if the last piece of trivia is a single line comment, the closing paren would be swallowed so we have to
-            // add a newline to ensure that doesn't happen which we then trim off later
-            var argumentList = ((InvocationExpressionSyntax)SyntaxFactory.ParseExpression($"M({separatedSyntaxList}\r\n)")).ArgumentList;
             var service = new CSharpTriviaLogicalOwnershipAssignmentService();
-            var assignedTrivia = service.AssignTriviaOwnership(argumentList.OpenParenToken, argumentList.Arguments, argumentList.CloseParenToken).ToArray();
+            var assignedTrivia = service.AssignTriviaOwnership(previousToken, syntaxList, nextToken).ToArray();
             Assert.Equal(expectedTrivia.Length, assignedTrivia.Length);
             for (int i = 0; i < expectedTrivia.Length; i++)
             {
-                // we had to add a newline to the end of the syntax list so we now need to strip it off of the last item
-                var trailingTrivia = assignedTrivia[i].Item2;
-                if (i == expectedTrivia.Length - 1)
-                {
-                    Assert.Equal(SyntaxKind.EndOfLineTrivia, trailingTrivia.Last().Kind());
-                    trailingTrivia = trailingTrivia.RemoveAt(trailingTrivia.Count - 1);
-                }
-
                 Assert.Equal(expectedTrivia[i].Item1, assignedTrivia[i].Item1.ToString());
-                Assert.Equal(expectedTrivia[i].Item2, trailingTrivia.ToString());
+                Assert.Equal(expectedTrivia[i].Item2, assignedTrivia[i].Item2.ToString());
             }
+        }
+
+        private void CheckInvocationExpression(string text, params Tuple<string, string>[] expectedTrivia)
+        {
+            var argumentList = ((InvocationExpressionSyntax)SyntaxFactory.ParseExpression(text)).ArgumentList;
+            Check(argumentList.OpenParenToken, argumentList.Arguments, argumentList.CloseParenToken, expectedTrivia);
+        }
+
+        private void CheckGenericArguments(string text, params Tuple<string, string>[] expectedTrivia)
+        {
+            var argumentList = ((GenericNameSyntax)SyntaxFactory.ParseName($"Tuple{text}")).TypeArgumentList;
+            Check(argumentList.LessThanToken, argumentList.Arguments, argumentList.GreaterThanToken, expectedTrivia);
+        }
+
+        private void CheckParameterList(string text, params Tuple<string, string>[] expectedTrivia)
+        {
+            var parameterList = SyntaxFactory.ParseParameterList(text);
+            Check(parameterList.OpenParenToken, parameterList.Parameters, parameterList.CloseParenToken, expectedTrivia);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Organizing)]
         public void InlineNoSpaces()
         {
-            Check("a,b,c",
+            CheckInvocationExpression("M(a,b,c)",
                   Tuple.Create("", ""),
                   Tuple.Create("", ""),
                   Tuple.Create("", ""));
@@ -47,7 +54,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Organizing
         [Fact, Trait(Traits.Feature, Traits.Features.Organizing)]
         public void InlineNoComments()
         {
-            Check("a, b, c",
+            CheckInvocationExpression("M(a, b, c)",
                   Tuple.Create("", ""),
                   Tuple.Create(" ", ""),
                   Tuple.Create(" ", ""));
@@ -56,9 +63,9 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Organizing
         [Fact, Trait(Traits.Feature, Traits.Features.Organizing)]
         public void MultiLineNoComments()
         {
-            Check(@"a,
+            CheckInvocationExpression(@"M(a,
 b,
-c",
+c)",
                   Tuple.Create("", "\r\n"),
                   Tuple.Create("", "\r\n"),
                   Tuple.Create("", ""));
@@ -67,24 +74,41 @@ c",
         [Fact, Trait(Traits.Feature, Traits.Features.Organizing)]
         public void MultiLineWithComments()
         {
-            Check(@"// a leading
+            CheckInvocationExpression(@"M(// a leading
 a, // a trailing
 // b leading
 /* b leading again */
 b, // b trailing
-/* c leading inline */ c // c trailing",
+/* c leading inline */ c // c trailing
+)",
                   Tuple.Create("// a leading\r\n", " // a trailing\r\n"),
-                  Tuple.Create("// b leading\r\n/* b leading again */\r\n", " // b trailing\r\n"),
-                  Tuple.Create("/* c leading inline */ ", " // c trailing"));
+                  Tuple.Create("", " // b trailing\r\n"), // not expecting any of the 'b leading' comments because they're already leading trivia on the node 'b'
+                  Tuple.Create("", "")); // not expecting any of the 'c' comments because they're already directly attached to the nodes
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Organizing)]
         public void SingleLineWithComments()
         {
-            Check("/* a leading */ a /* a trailing */, /* b leading */ b /* b trailing */, /* c leading */ c /* c trailing */",
-                  Tuple.Create("/* a leading */ ", " /* a trailing */"),
-                  Tuple.Create(" /* b leading */ ", " /* b trailing */"),
-                  Tuple.Create(" /* c leading */ ", " /* c trailing */"));
+            CheckInvocationExpression("M(/* a leading */ a /* a trailing */, /* b leading */ b /* b trailing */, /* c leading */ c /* c trailing */)",
+                  Tuple.Create("/* a leading */ ", ""), // not expecting '/* a trailing */' because it's already attached to 'a'
+                  Tuple.Create(" /* b leading */ ", ""), // not expecting '/* b trailing */' because it's already attached to 'b'
+                  Tuple.Create(" /* c leading */ ", "")); // not expecting '/* c trailing */' because it's already attached to 'c'
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Organizing)]
+        public void SingleLineTypeArgumentListWithComments()
+        {
+            CheckGenericArguments("</* int leading */ int /* int trailing*/, /* string leading */ string /* string trailing */>",
+                Tuple.Create("/* int leading */ ", ""), // not expecting '/* int trailing */' because it's already attached to 'int'
+                Tuple.Create(" /* string leading */ ", "")); // not expecting '/* string trailing */' because it's already attached to 'string'
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Organizing)]
+        public void SingleLineParameterListWithComments()
+        {
+            CheckParameterList("(/* int leading */ int i /* int trailing*/, /* string leading */ string s /* string trailing */)",
+                Tuple.Create("/* int leading */ ", ""), // not expecting '/* int trailing */' because it's already attached to 'int'
+                Tuple.Create(" /* string leading */ ", "")); // not expecting '/* string trailing */' because it's already attached to 'string'
         }
     }
 }

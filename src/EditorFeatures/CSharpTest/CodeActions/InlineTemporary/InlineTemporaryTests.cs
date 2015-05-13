@@ -204,7 +204,7 @@ class C
             [||]c = 1; // comment c
         int x = c; // comment x
     }
-]
+}
 ";
 
             var expected = @"
@@ -234,10 +234,10 @@ class C
     void M()
     {
         // comment int
-        int /* a lead */ [||]a = 1 /* a trail*/, /* b lead */ b = 1 /* b trail */, /* c lead */ c = 1 /* c trail */; // trail
+        int /* a lead */ [||]a = 1 /* a trail */, /* b lead */ b = 1 /* b trail */, /* c lead */ c = 1 /* c trail */; // trail
         int x = a; // comment x
     }
-]
+}
 ";
 
             var expected = @"
@@ -267,10 +267,10 @@ class C
     void M()
     {
         // comment int
-        int /* a lead */ a = 1 /* a trail*/, /* b lead */ [||]b = 1 /* b trail */, /* c lead */ c = 1 /* c trail */; // trail
+        int /* a lead */ a = 1 /* a trail */, /* b lead */ [||]b = 1 /* b trail */, /* c lead */ c = 1 /* c trail */; // trail
         int x = b; // comment x
     }
-]
+}
 ";
 
             var expected = @"
@@ -300,10 +300,10 @@ class C
     void M()
     {
         // comment int
-        int /* a lead */ a = 1 /* a trail*/, /* b lead */ b = 1 /* b trail */, /* c lead */ [||]c = 1 /* c trail */; // trail
+        int /* a lead */ a = 1 /* a trail */, /* b lead */ b = 1 /* b trail */, /* c lead */ [||]c = 1 /* c trail */; // trail
         int x = c; // comment x
     }
-]
+}
 ";
 
             var expected = @"
