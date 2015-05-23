@@ -42,6 +42,12 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Organizing
             Check(parameterList.OpenParenToken, parameterList.Parameters, parameterList.CloseParenToken, expectedTrivia);
         }
 
+        private void CheckLocalDeclarationStatement(string text, params Tuple<string, string>[] expectedTrivia)
+        {
+            var localDeclaration = (LocalDeclarationStatementSyntax)SyntaxFactory.ParseStatement(text);
+            Check(localDeclaration.Declaration.Type.GetLastToken(), localDeclaration.Declaration.Variables, localDeclaration.SemicolonToken, expectedTrivia);
+        }
+
         [Fact, Trait(Traits.Feature, Traits.Features.Organizing)]
         public void InlineNoSpaces()
         {
@@ -109,6 +115,31 @@ b, // b trailing
             CheckParameterList("(/* int leading */ int i /* int trailing*/, /* string leading */ string s /* string trailing */)",
                 Tuple.Create("/* int leading */ ", ""), // not expecting '/* int trailing */' because it's already attached to 'int'
                 Tuple.Create(" /* string leading */ ", "")); // not expecting '/* string trailing */' because it's already attached to 'string'
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Organizing)]
+        public void MultiLineLocalDeclarationStatementWithComments1()
+        {
+            // 'c trailing' is really trailing trivia on the semicolon, but logically, it's tied to 'c'
+            CheckLocalDeclarationStatement(@"
+int a = 1,
+    b = 2,
+    c = 3; // c trailing",
+                Tuple.Create(" ", "\r\n"),
+                Tuple.Create("", "\r\n"),
+                Tuple.Create("", " // c trailing"));
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Organizing)]
+        public void MultiLineLocalDeclarationStatementWithComments2()
+        {
+            // since the 'c' declaration isn't on its own line, the final comment should not be associated with it
+            CheckLocalDeclarationStatement(@"
+int a = 1,
+    b = 2, c = 3; // final trailing",
+                Tuple.Create(" ", "\r\n"),
+                Tuple.Create("", ""),
+                Tuple.Create(" ", ""));
         }
     }
 }

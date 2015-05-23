@@ -338,7 +338,6 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeRefactorings.InlineTemporary
 
             // build new variable list
             var newVariables = new List<SyntaxNodeOrToken>();
-            var finalTrivia = new SyntaxTriviaList();
             for (int i = 0; i < variableDeclaration.Variables.Count; i++)
             {
                 if (i == declarationIndexToRemove)
@@ -354,7 +353,6 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeRefactorings.InlineTemporary
                     if (i == variableDeclaration.Variables.Count - 1)
                     {
                         // save the trailing trivia for the closing semicolon and keep the existing declarator
-                        finalTrivia = triviaParts[i].Item2;
                         newVariables.Add(newDeclarator);
                     }
                     else
@@ -378,7 +376,13 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeRefactorings.InlineTemporary
 
             // create the new variable declaration, add the final trivia, and ensure it ends with a newline
             var newLocalDeclaration = localDeclaration.WithDeclaration(localDeclaration.Declaration.WithVariables(SyntaxFactory.SeparatedList<VariableDeclaratorSyntax>(newVariables)));
-            newLocalDeclaration = newLocalDeclaration.WithAppendedTrailingTrivia(finalTrivia);
+            if (declarationIndexToRemove == 0)
+            {
+                // remove the declaration type's trailing trivia, because it was already gathered and applied earlier
+                var type = newLocalDeclaration.Declaration.Type;
+                newLocalDeclaration = newLocalDeclaration.ReplaceNode(type, type.WithoutTrailingTrivia());
+            }
+
             var finalTrailingTrivia = newVariables.Last().AsNode().GetTrailingTrivia();
             if (finalTrailingTrivia.Count == 0 || !finalTrailingTrivia.Last().IsKind(SyntaxKind.EndOfLineTrivia))
             {
@@ -387,6 +391,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeRefactorings.InlineTemporary
 
             // add trivia from the removed node to the declaration, unless it's only whitespace
             var newLeadingTrivia = triviaParts[declarationIndexToRemove].Item1
+                                    .Concat(variableDeclarator.GetLeadingTrivia())
                                     .Concat(variableDeclarator.GetTrailingTrivia())
                                     .Concat(triviaParts[declarationIndexToRemove].Item2)
                                     .ToArray();
@@ -404,12 +409,6 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeRefactorings.InlineTemporary
                 }
 
                 newLocalDeclaration = newLocalDeclaration.WithLeadingTrivia(newLocalDeclaration.GetLeadingTrivia().Concat(newLeadingTriviaWithNewlines));
-            }
-
-            if (declarationIndexToRemove == variableDeclaration.Variables.Count - 1)
-            {
-                // if we removed the last declaration, there might be trailing trivia on the semicolon that we want to promote,
-                // but only if the last declaration was on it's own line and the semicolon was on the same line
             }
 
             return scope.ReplaceNode(localDeclaration, newLocalDeclaration.WithAdditionalAnnotations(Formatter.Annotation));
@@ -542,7 +541,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeRefactorings.InlineTemporary
             // Now that the variable declarator is normalized, make its initializer
             // value semantically explicit.
             newExpression = await Simplifier.ExpandAsync(newVariableDeclarator.Initializer.Value, updatedDocument, cancellationToken: cancellationToken).ConfigureAwait(false);
-            return newExpression.WithAdditionalAnnotations(ExpressionToInlineAnnotation);
+            return newExpression.WithAdditionalAnnotations(ExpressionToInlineAnnotation).WithoutTrivia();
         }
 
         private static SyntaxNode GetTopMostParentingExpression(ExpressionSyntax expression)

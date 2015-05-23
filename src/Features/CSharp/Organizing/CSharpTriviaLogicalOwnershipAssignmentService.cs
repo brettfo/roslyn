@@ -31,6 +31,24 @@ namespace Microsoft.CodeAnalysis.CSharp.Organizing
                 {
                     // if we're looking at the last node then there is no separator so instead we use the trailing token's leading trivia
                     trailingTrivia = nextToken.LeadingTrivia;
+
+                    // And if the last node is on its own line and the next token is also on that same line, then the next token's
+                    // trailing trivia also belongs to the last node.  When determining if the last node is on its own line:
+                    //   if there is only one node, it's always on its own line
+                    //   else if there is a newline anywhere between the penultimate node and the last node
+                    var isLastNodeOnOwnLine = syntaxList.Count == 1
+                        ? true
+                        : ContainsNewLines(syntaxList[i - 1].GetTrailingTrivia()) ||
+                          ContainsNewLines(syntaxList[i].GetLeadingTrivia()) ||
+                          ContainsNewLines(syntaxList.GetSeparator(i - 1).GetAllTrivia());
+                    if (isLastNodeOnOwnLine)
+                    {
+                        // check if the next token is on the same line as the last node
+                        if (!ContainsNewLines(syntaxList[i].GetTrailingTrivia()) && !ContainsNewLines(nextToken.LeadingTrivia))
+                        {
+                            trailingTrivia = trailingTrivia.Concat(nextToken.TrailingTrivia);
+                        }
+                    }
                 }
                 else
                 {
@@ -60,7 +78,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Organizing
             }
         }
 
-        private static bool ContainsNewLines(SyntaxTriviaList trivia)
+        private static bool ContainsNewLines(IEnumerable<SyntaxTrivia> trivia)
         {
             return trivia.Any(t => t.IsKind(SyntaxKind.EndOfLineTrivia));
         }
