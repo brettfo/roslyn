@@ -78,6 +78,93 @@ namespace Microsoft.CodeAnalysis.CSharp.Organizing
             }
         }
 
+        public void RemoveNode<T>(
+            SyntaxToken previousToken,
+            SeparatedSyntaxList<T> syntaxList,
+            SyntaxToken nextToken,
+            int indexToRemove,
+            out SyntaxToken newPreviousToken,
+            out SeparatedSyntaxList<T> newSyntaxList,
+            out SyntaxToken newNextToken,
+            out Tuple<SyntaxTriviaList, SyntaxTriviaList> removedTrivia) where T : SyntaxNode
+        {
+            // TODO: validate arguments and syntaxList.Count
+
+            newPreviousToken = previousToken;
+            newNextToken = nextToken;
+
+            var triviaParts = AssignTriviaOwnership(previousToken, syntaxList, nextToken).ToArray();
+
+            // build new syntax list
+            var newItems = new List<SyntaxNodeOrToken>();
+            for (int i = 0; i < syntaxList.Count; i++)
+            {
+                if (i == indexToRemove)
+                {
+                    // skip the one we're removing for now
+                }
+                else
+                {
+                    // add the leading trivia only if it's not the first node, because that was actually trailing trivia on the previous token
+                    var newItem = i == 0
+                        ? syntaxList[i]
+                        : syntaxList[i].WithLeadingTrivia(triviaParts[i].Item1);
+                    newItems.Add(newItem);
+                    if (i < syntaxList.Count - 1)
+                    {
+                        // add the separator with the appropriate trailing trivia
+                        newItems.Add(syntaxList.GetSeparator(i).WithTrailingTrivia(triviaParts[i].Item2));
+                    }
+                }
+            }
+
+            // if removing the last item, promote the last separator's trivia to be trailing on the last item and remove it
+            if (indexToRemove == syntaxList.Count - 1)
+            {
+                var lastSeparator = newItems.Last().AsToken();
+                newItems.RemoveAt(newItems.Count - 1);
+                var lastItem = newItems.Last().AsNode();
+                newItems.RemoveAt(newItems.Count - 1);
+                newItems.Add(lastItem.WithAppendedTrailingTrivia(lastSeparator.LeadingTrivia).WithAppendedTrailingTrivia(lastSeparator.TrailingTrivia));
+            }
+
+            if (indexToRemove == 0)
+            {
+                // remove the previous token's trailing trivia because it was already assigned and applied earlier
+                newPreviousToken = previousToken.WithTrailingTrivia();
+            }
+
+            var finalTrailingTrivia = newItems.Last().AsNode().GetTrailingTrivia();
+            if (finalTrailingTrivia.Count == 0 || !finalTrailingTrivia.Last().IsKind(SyntaxKind.EndOfLineTrivia))
+            {
+                newItems[newItems.Count - 1] = newItems.Last().AsNode().WithAppendedTrailingTrivia(SyntaxFactory.EndOfLine(string.Empty));
+            }
+
+            // add trivia from the removed node to the list, unless it's only whitespace
+            var newLeadingTrivia = triviaParts[indexToRemove].Item1
+                                    //.Concat(variableDeclarator.GetLeadingTrivia())
+                                    //.Concat(variableDeclarator.GetTrailingTrivia())
+                                    .Concat(triviaParts[indexToRemove].Item2)
+                                    .ToArray();
+            if (newLeadingTrivia.Any(t => !t.IsWhitespaceOrEndOfLine()))
+            {
+                // make sure comments start on their own line by inserting newlines after each comment if not present
+                var newLeadingTriviaWithNewLines = new List<SyntaxTrivia>();
+                for (int i = 0; i < newLeadingTrivia.Length; i++)
+                {
+                    newLeadingTriviaWithNewLines.Add(newLeadingTrivia[i]);
+                    if (newLeadingTrivia[i].IsRegularOrDocComment() && i < newLeadingTrivia.Length - 1 && newLeadingTrivia[i + 1].Kind() != SyntaxKind.EndOfLineTrivia)
+                    {
+                        newLeadingTriviaWithNewLines.Add(SyntaxFactory.EndOfLine(string.Empty));
+                    }
+                }
+
+                //newLocalDeclaration = newLocalDeclaration.WithLeadingTrivia(newLocalDeclaration.GetLeadingTrivia().Concat(newLeadingTriviaWithNewlines));
+            }
+
+            newSyntaxList = newItems.ToSyntaxList();
+        }
+
         private static bool ContainsNewLines(IEnumerable<SyntaxTrivia> trivia)
         {
             return trivia.Any(t => t.IsKind(SyntaxKind.EndOfLineTrivia));

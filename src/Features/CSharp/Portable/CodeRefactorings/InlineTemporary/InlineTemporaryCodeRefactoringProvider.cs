@@ -334,82 +334,11 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeRefactorings.InlineTemporary
             var scope = GetScope(variableDeclarator);
 
             var declarationIndexToRemove = variableDeclaration.Variables.TakeWhile(v => !v.Equals(variableDeclarator)).Count();
-            var triviaParts = _triviaAssignmentService.AssignTriviaOwnership(variableDeclaration.Type.GetLastToken(), variableDeclaration.Variables, localDeclaration.SemicolonToken).ToArray();
 
-            // build new variable list
-            var newVariables = new List<SyntaxNodeOrToken>();
-            for (int i = 0; i < variableDeclaration.Variables.Count; i++)
-            {
-                if (i == declarationIndexToRemove)
-                {
-                    // skip the one we're removing for now
-                }
-                else
-                {
-                    // add the leading trivia only if it's not the first node, because that was actually trailing trivia on the type name
-                    var newDeclarator = i == 0
-                        ? variableDeclaration.Variables[i]
-                        : variableDeclaration.Variables[i].WithLeadingTrivia(triviaParts[i].Item1);
-                    if (i == variableDeclaration.Variables.Count - 1)
-                    {
-                        // save the trailing trivia for the closing semicolon and keep the existing declarator
-                        newVariables.Add(newDeclarator);
-                    }
-                    else
-                    {
-                        // add separator with the appropriate trailing trivia
-                        newVariables.Add(newDeclarator);
-                        newVariables.Add(variableDeclaration.Variables.GetSeparator(i).WithTrailingTrivia(triviaParts[i].Item2));
-                    }
-                }
-            }
-
-            // if removing the last declarator, promote the last separator's trivia to be trailing on the last declarator and remove it
-            if (declarationIndexToRemove == variableDeclaration.Variables.Count - 1)
-            {
-                var lastSeparator = newVariables.Last().AsToken();
-                newVariables.RemoveAt(newVariables.Count - 1);
-                var lastDeclarator = newVariables.Last().AsNode();
-                newVariables.RemoveAt(newVariables.Count - 1);
-                newVariables.Add(lastDeclarator.WithAppendedTrailingTrivia(lastSeparator.LeadingTrivia).WithAppendedTrailingTrivia(lastSeparator.TrailingTrivia));
-            }
-
-            // create the new variable declaration, add the final trivia, and ensure it ends with a newline
-            var newLocalDeclaration = localDeclaration.WithDeclaration(localDeclaration.Declaration.WithVariables(SyntaxFactory.SeparatedList<VariableDeclaratorSyntax>(newVariables)));
-            if (declarationIndexToRemove == 0)
-            {
-                // remove the declaration type's trailing trivia, because it was already gathered and applied earlier
-                var type = newLocalDeclaration.Declaration.Type;
-                newLocalDeclaration = newLocalDeclaration.ReplaceNode(type, type.WithoutTrailingTrivia());
-            }
-
-            var finalTrailingTrivia = newVariables.Last().AsNode().GetTrailingTrivia();
-            if (finalTrailingTrivia.Count == 0 || !finalTrailingTrivia.Last().IsKind(SyntaxKind.EndOfLineTrivia))
-            {
-                newVariables[newVariables.Count - 1] = newVariables.Last().AsNode().WithAppendedTrailingTrivia(SyntaxFactory.EndOfLine(""));
-            }
-
-            // add trivia from the removed node to the declaration, unless it's only whitespace
-            var newLeadingTrivia = triviaParts[declarationIndexToRemove].Item1
-                                    .Concat(variableDeclarator.GetLeadingTrivia())
-                                    .Concat(variableDeclarator.GetTrailingTrivia())
-                                    .Concat(triviaParts[declarationIndexToRemove].Item2)
-                                    .ToArray();
-            if (newLeadingTrivia.Any(t => !t.IsWhitespaceOrEndOfLine()))
-            {
-                // make sure comments start on their own line by inserting newlines after each comment if not present
-                var newLeadingTriviaWithNewlines = new List<SyntaxTrivia>();
-                for (int i = 0; i < newLeadingTrivia.Length; i++)
-                {
-                    newLeadingTriviaWithNewlines.Add(newLeadingTrivia[i]);
-                    if (newLeadingTrivia[i].IsRegularOrDocComment() && i < newLeadingTrivia.Length - 1 && newLeadingTrivia[i + 1].Kind() != SyntaxKind.EndOfLineTrivia)
-                    {
-                        newLeadingTriviaWithNewlines.Add(SyntaxFactory.EndOfLine(""));
-                    }
-                }
-
-                newLocalDeclaration = newLocalDeclaration.WithLeadingTrivia(newLocalDeclaration.GetLeadingTrivia().Concat(newLeadingTriviaWithNewlines));
-            }
+            SyntaxToken newPreviousToken, newNextToken;
+            SeparatedSyntaxList<VariableDeclaratorSyntax> newSyntaxList;
+            Tuple<SyntaxTriviaList, SyntaxTriviaList> removedTrivia;
+            _triviaAssignmentService.RemoveNode(variableDeclaration.Type.GetLastToken(), variableDeclaration.Variables, localDeclaration.SemicolonToken, declarationIndexToRemove, out newPreviousToken, out newSyntaxList, out newNextToken, out removedTrivia);
 
             return scope.ReplaceNode(localDeclaration, newLocalDeclaration.WithAdditionalAnnotations(Formatter.Annotation));
         }

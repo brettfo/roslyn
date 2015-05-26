@@ -8,5 +8,14 @@ namespace Microsoft.CodeAnalysis.Organizing
     public interface ITriviaLogicalOwnershipAssignmentService
     {
         IEnumerable<Tuple<SyntaxTriviaList, SyntaxTriviaList>> AssignTriviaOwnership<T>(SyntaxToken previousToken, SeparatedSyntaxList<T> syntaxList, SyntaxToken nextToken) where T : SyntaxNode;
+        void RemoveNode<T>(
+            SyntaxToken previousToken,
+            SeparatedSyntaxList<T> syntaxList,
+            SyntaxToken nextToken,
+            int indexToRemove,
+            out SyntaxToken newPreviousToken,
+            out SeparatedSyntaxList<T> newSyntaxList,
+            out SyntaxToken newNextToken,
+            out Tuple<SyntaxTriviaList, SyntaxTriviaList> removedTrivia) where T : SyntaxNode;
     }
 }

@@ -12,7 +12,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Organizing
 {
     public class TriviaOwnershipAssignmentTests
     {
-        private void Check<T>(SyntaxToken previousToken, SeparatedSyntaxList<T> syntaxList, SyntaxToken nextToken, params Tuple<string, string>[] expectedTrivia) where T : SyntaxNode
+        private void CheckAssignment<T>(SyntaxToken previousToken, SeparatedSyntaxList<T> syntaxList, SyntaxToken nextToken, params Tuple<string, string>[] expectedTrivia) where T : SyntaxNode
         {
             var service = new CSharpTriviaLogicalOwnershipAssignmentService();
             var assignedTrivia = service.AssignTriviaOwnership(previousToken, syntaxList, nextToken).ToArray();
@@ -27,25 +27,34 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Organizing
         private void CheckInvocationExpression(string text, params Tuple<string, string>[] expectedTrivia)
         {
             var argumentList = ((InvocationExpressionSyntax)SyntaxFactory.ParseExpression(text)).ArgumentList;
-            Check(argumentList.OpenParenToken, argumentList.Arguments, argumentList.CloseParenToken, expectedTrivia);
+            CheckAssignment(argumentList.OpenParenToken, argumentList.Arguments, argumentList.CloseParenToken, expectedTrivia);
         }
 
         private void CheckGenericArguments(string text, params Tuple<string, string>[] expectedTrivia)
         {
             var argumentList = ((GenericNameSyntax)SyntaxFactory.ParseName($"Tuple{text}")).TypeArgumentList;
-            Check(argumentList.LessThanToken, argumentList.Arguments, argumentList.GreaterThanToken, expectedTrivia);
+            CheckAssignment(argumentList.LessThanToken, argumentList.Arguments, argumentList.GreaterThanToken, expectedTrivia);
         }
 
         private void CheckParameterList(string text, params Tuple<string, string>[] expectedTrivia)
         {
             var parameterList = SyntaxFactory.ParseParameterList(text);
-            Check(parameterList.OpenParenToken, parameterList.Parameters, parameterList.CloseParenToken, expectedTrivia);
+            CheckAssignment(parameterList.OpenParenToken, parameterList.Parameters, parameterList.CloseParenToken, expectedTrivia);
         }
 
         private void CheckLocalDeclarationStatement(string text, params Tuple<string, string>[] expectedTrivia)
         {
             var localDeclaration = (LocalDeclarationStatementSyntax)SyntaxFactory.ParseStatement(text);
-            Check(localDeclaration.Declaration.Type.GetLastToken(), localDeclaration.Declaration.Variables, localDeclaration.SemicolonToken, expectedTrivia);
+            CheckAssignment(localDeclaration.Declaration.Type.GetLastToken(), localDeclaration.Declaration.Variables, localDeclaration.SemicolonToken, expectedTrivia);
+        }
+
+        private void CheckRemoval<T>(SyntaxToken previousToken, SeparatedSyntaxList<T> syntaxList, SyntaxToken nextToken, int indexToRemove, SyntaxToken newPreviousToken) where T : SyntaxNode
+        {
+            var service = new CSharpTriviaLogicalOwnershipAssignmentService();
+            SyntaxToken actualNewPreviousToken, actualNewNextToken;
+            SeparatedSyntaxList<T> actualNewSyntaxList;
+            Tuple<SyntaxTriviaList, SyntaxTriviaList> actualRemovedTrivia;
+            service.RemoveNode(previousToken, syntaxList, nextToken, indexToRemove, out actualNewPreviousToken, out actualNewSyntaxList, out actualNewNextToken, out actualRemovedTrivia);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Organizing)]
