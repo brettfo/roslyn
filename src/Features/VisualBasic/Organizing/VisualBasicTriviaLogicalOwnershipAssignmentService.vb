@@ -50,6 +50,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Organizing
         Private Shared Function ContainsNewLines(trivia As SyntaxTriviaList) As Boolean
             Return trivia.Any(Function(t) t.IsKind(SyntaxKind.EndOfLineTrivia))
         End Function
+
+        Public Sub RemoveNode(Of T As SyntaxNode)(previousToken As SyntaxToken, syntaxList As SeparatedSyntaxList(Of T), nextToken As SyntaxToken, indexToRemove As Integer, ByRef newPreviousToken As SyntaxToken, ByRef newSyntaxList As SeparatedSyntaxList(Of T), ByRef newNextToken As SyntaxToken, ByRef removedTrivia As Tuple(Of SyntaxTriviaList, SyntaxTriviaList)) Implements ITriviaLogicalOwnershipAssignmentService.RemoveNode
+            Throw New NotImplementedException()
+        End Sub
     End Class
 
 End Namespace

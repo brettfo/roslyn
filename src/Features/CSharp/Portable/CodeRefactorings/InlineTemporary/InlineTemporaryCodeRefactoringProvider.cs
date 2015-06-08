@@ -340,7 +340,8 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeRefactorings.InlineTemporary
             Tuple<SyntaxTriviaList, SyntaxTriviaList> removedTrivia;
             _triviaAssignmentService.RemoveNode(variableDeclaration.Type.GetLastToken(), variableDeclaration.Variables, localDeclaration.SemicolonToken, declarationIndexToRemove, out newPreviousToken, out newSyntaxList, out newNextToken, out removedTrivia);
 
-            return scope.ReplaceNode(localDeclaration, newLocalDeclaration.WithAdditionalAnnotations(Formatter.Annotation));
+            //return scope.ReplaceNode(localDeclaration, newLocalDeclaration.WithAdditionalAnnotations(Formatter.Annotation));
+            return scope;
         }
 
         private SyntaxNode RemoveDeclaratorFromScope(VariableDeclaratorSyntax variableDeclarator, SyntaxNode scope)

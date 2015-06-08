@@ -24,61 +24,76 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Organizing
             }
         }
 
-        private void CheckInvocationExpression(string text, params Tuple<string, string>[] expectedTrivia)
+        private void CheckInvocationExpressionOwnership(string text, params Tuple<string, string>[] expectedTrivia)
         {
             var argumentList = ((InvocationExpressionSyntax)SyntaxFactory.ParseExpression(text)).ArgumentList;
             CheckAssignment(argumentList.OpenParenToken, argumentList.Arguments, argumentList.CloseParenToken, expectedTrivia);
         }
 
-        private void CheckGenericArguments(string text, params Tuple<string, string>[] expectedTrivia)
+        private void CheckGenericArgumentsOwnership(string text, params Tuple<string, string>[] expectedTrivia)
         {
             var argumentList = ((GenericNameSyntax)SyntaxFactory.ParseName($"Tuple{text}")).TypeArgumentList;
             CheckAssignment(argumentList.LessThanToken, argumentList.Arguments, argumentList.GreaterThanToken, expectedTrivia);
         }
 
-        private void CheckParameterList(string text, params Tuple<string, string>[] expectedTrivia)
+        private void CheckParameterListOwnership(string text, params Tuple<string, string>[] expectedTrivia)
         {
             var parameterList = SyntaxFactory.ParseParameterList(text);
             CheckAssignment(parameterList.OpenParenToken, parameterList.Parameters, parameterList.CloseParenToken, expectedTrivia);
         }
 
-        private void CheckLocalDeclarationStatement(string text, params Tuple<string, string>[] expectedTrivia)
+        private void CheckLocalDeclarationStatementOwnership(string text, params Tuple<string, string>[] expectedTrivia)
         {
             var localDeclaration = (LocalDeclarationStatementSyntax)SyntaxFactory.ParseStatement(text);
             CheckAssignment(localDeclaration.Declaration.Type.GetLastToken(), localDeclaration.Declaration.Variables, localDeclaration.SemicolonToken, expectedTrivia);
         }
 
-        private void CheckRemoval<T>(SyntaxToken previousToken, SeparatedSyntaxList<T> syntaxList, SyntaxToken nextToken, int indexToRemove, SyntaxToken newPreviousToken) where T : SyntaxNode
+        private Tuple<SyntaxToken, SeparatedSyntaxList<T>, SyntaxToken, SyntaxTriviaList, SyntaxTriviaList> CheckRemoval<T>(SyntaxToken previousToken, SeparatedSyntaxList<T> syntaxList, SyntaxToken nextToken, int indexToRemove) where T : SyntaxNode
         {
             var service = new CSharpTriviaLogicalOwnershipAssignmentService();
             SyntaxToken actualNewPreviousToken, actualNewNextToken;
             SeparatedSyntaxList<T> actualNewSyntaxList;
             Tuple<SyntaxTriviaList, SyntaxTriviaList> actualRemovedTrivia;
             service.RemoveNode(previousToken, syntaxList, nextToken, indexToRemove, out actualNewPreviousToken, out actualNewSyntaxList, out actualNewNextToken, out actualRemovedTrivia);
+            return Tuple.Create(actualNewPreviousToken, actualNewSyntaxList, actualNewNextToken, actualRemovedTrivia.Item1, actualRemovedTrivia.Item2);
+        }
+
+        private void CheckInvocationExpressionRemoval(string text, int indexToRemove, string expectedText, string removedLeadingTrivia, string removedTrailingTrivia)
+        {
+            var invocationExpression = (InvocationExpressionSyntax)SyntaxFactory.ParseExpression(text);
+            var argumentList = invocationExpression.ArgumentList;
+            var result = CheckRemoval(argumentList.OpenParenToken, argumentList.Arguments, argumentList.CloseParenToken, indexToRemove);
+            var newInvocationExpression = invocationExpression.WithArgumentList(
+                argumentList.WithOpenParenToken(result.Item1)
+                    .WithCloseParenToken(result.Item3)
+                    .WithArguments(result.Item2));
+            Assert.Equal(expectedText, newInvocationExpression.ToFullString());
+            Assert.Equal(removedLeadingTrivia, result.Item4.ToFullString());
+            Assert.Equal(removedTrailingTrivia, result.Item5.ToFullString());
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Organizing)]
-        public void InlineNoSpaces()
+        public void InlineNoSpacesOwnership()
         {
-            CheckInvocationExpression("M(a,b,c)",
+            CheckInvocationExpressionOwnership("M(a,b,c)",
                   Tuple.Create("", ""),
                   Tuple.Create("", ""),
                   Tuple.Create("", ""));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Organizing)]
-        public void InlineNoComments()
+        public void InlineNoCommentsOwnership()
         {
-            CheckInvocationExpression("M(a, b, c)",
+            CheckInvocationExpressionOwnership("M(a, b, c)",
                   Tuple.Create("", ""),
                   Tuple.Create(" ", ""),
                   Tuple.Create(" ", ""));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Organizing)]
-        public void MultiLineNoComments()
+        public void MultiLineNoCommentsOwnership()
         {
-            CheckInvocationExpression(@"M(a,
+            CheckInvocationExpressionOwnership(@"M(a,
 b,
 c)",
                   Tuple.Create("", "\r\n"),
@@ -87,9 +102,9 @@ c)",
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Organizing)]
-        public void MultiLineWithComments()
+        public void MultiLineWithCommentsOwnership()
         {
-            CheckInvocationExpression(@"M(// a leading
+            CheckInvocationExpressionOwnership(@"M(// a leading
 a, // a trailing
 // b leading
 /* b leading again */
@@ -102,35 +117,35 @@ b, // b trailing
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Organizing)]
-        public void SingleLineWithComments()
+        public void SingleLineWithCommentsOwnership()
         {
-            CheckInvocationExpression("M(/* a leading */ a /* a trailing */, /* b leading */ b /* b trailing */, /* c leading */ c /* c trailing */)",
+            CheckInvocationExpressionOwnership("M(/* a leading */ a /* a trailing */, /* b leading */ b /* b trailing */, /* c leading */ c /* c trailing */)",
                   Tuple.Create("/* a leading */ ", ""), // not expecting '/* a trailing */' because it's already attached to 'a'
                   Tuple.Create(" /* b leading */ ", ""), // not expecting '/* b trailing */' because it's already attached to 'b'
                   Tuple.Create(" /* c leading */ ", "")); // not expecting '/* c trailing */' because it's already attached to 'c'
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Organizing)]
-        public void SingleLineTypeArgumentListWithComments()
+        public void SingleLineTypeArgumentListWithCommentsOwnership()
         {
-            CheckGenericArguments("</* int leading */ int /* int trailing*/, /* string leading */ string /* string trailing */>",
+            CheckGenericArgumentsOwnership("</* int leading */ int /* int trailing*/, /* string leading */ string /* string trailing */>",
                 Tuple.Create("/* int leading */ ", ""), // not expecting '/* int trailing */' because it's already attached to 'int'
                 Tuple.Create(" /* string leading */ ", "")); // not expecting '/* string trailing */' because it's already attached to 'string'
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Organizing)]
-        public void SingleLineParameterListWithComments()
+        public void SingleLineParameterListWithCommentsOwnership()
         {
-            CheckParameterList("(/* int leading */ int i /* int trailing*/, /* string leading */ string s /* string trailing */)",
+            CheckParameterListOwnership("(/* int leading */ int i /* int trailing*/, /* string leading */ string s /* string trailing */)",
                 Tuple.Create("/* int leading */ ", ""), // not expecting '/* int trailing */' because it's already attached to 'int'
                 Tuple.Create(" /* string leading */ ", "")); // not expecting '/* string trailing */' because it's already attached to 'string'
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Organizing)]
-        public void MultiLineLocalDeclarationStatementWithComments1()
+        public void MultiLineLocalDeclarationStatementWithCommentsOwnership1()
         {
             // 'c trailing' is really trailing trivia on the semicolon, but logically, it's tied to 'c'
-            CheckLocalDeclarationStatement(@"
+            CheckLocalDeclarationStatementOwnership(@"
 int a = 1,
     b = 2,
     c = 3; // c trailing",
@@ -140,15 +155,82 @@ int a = 1,
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Organizing)]
-        public void MultiLineLocalDeclarationStatementWithComments2()
+        public void MultiLineLocalDeclarationStatementWithCommentsOwnership2()
         {
             // since the 'c' declaration isn't on its own line, the final comment should not be associated with it
-            CheckLocalDeclarationStatement(@"
+            CheckLocalDeclarationStatementOwnership(@"
 int a = 1,
     b = 2, c = 3; // final trailing",
                 Tuple.Create(" ", "\r\n"),
                 Tuple.Create("", ""),
                 Tuple.Create(" ", ""));
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Organizing)]
+        public void RemoveSingleItem()
+        {
+            CheckInvocationExpressionRemoval(
+                text: "M(/*leading*/0/*trailing*/) // final trailing comment",
+                indexToRemove: 0,
+                expectedText: "M() // final trailing comment",
+                removedLeadingTrivia: "/*leading*/",
+                removedTrailingTrivia: ""); // '/*trailing*/' is already attached to the argument '0'
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Organizing)]
+        public void RemoveFirstOfManyItems()
+        {
+            CheckInvocationExpressionRemoval(
+                text: "M(/*a0*/0/*a1*/, /*b0*/1/*b1*/, /*c0*/2/*c1*/) // final trailing comment",
+                indexToRemove: 0,
+                expectedText: "M( /*b0*/1/*b1*/, /*c0*/2/*c1*/) // final trailing comment",
+                removedLeadingTrivia: "/*a0*/",
+                removedTrailingTrivia: ""); // '/*a1*/' is already attached to the argument '0'
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Organizing)]
+        public void RemoveMedialOfManyItems()
+        {
+            CheckInvocationExpressionRemoval(
+                text: "M(/*a0*/0/*a1*/, /*b0*/1/*b1*/, /*c0*/2/*c1*/) // final trailing comment",
+                indexToRemove: 1,
+                expectedText: "M(/*a0*/0/*a1*/, /*c0*/2/*c1*/) // final trailing comment",
+                removedLeadingTrivia: " /*b0*/",
+                removedTrailingTrivia: ""); // '/*b1*/' is already attached to the argument '1'
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Organizing)]
+        public void RemoveLastOfManyItems()
+        {
+            CheckInvocationExpressionRemoval(
+                text: "M(/*a0*/0/*a1*/, /*b0*/1/*b1*/, /*c0*/2/*c1*/) // final trailing comment",
+                indexToRemove: 2,
+                expectedText: "M(/*a0*/0/*a1*/, /*b0*/1/*b1*/) // final trailing comment",
+                removedLeadingTrivia: " /*c0*/",
+                removedTrailingTrivia: ""); // '/*c1*/' is already attached to the argument '2'
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Organizing)]
+        public void RemoveFirstFromMultilineInvocation()
+        {
+            CheckInvocationExpressionRemoval(
+                text: @"
+M(// a leading
+a, // a trailing
+// b leading
+/* b leading again */
+b, // b trailing
+/* c leading inline */ c // c trailing
+)
+",
+                indexToRemove: 0,
+                expectedText: @"M(// b leading
+/* b leading again */
+b, // b trailing
+/* c leading inline */ c // c trailing
+)",
+                removedLeadingTrivia: "// a leading",
+                removedTrailingTrivia: " // a trailing\r\n");
         }
     }
 }

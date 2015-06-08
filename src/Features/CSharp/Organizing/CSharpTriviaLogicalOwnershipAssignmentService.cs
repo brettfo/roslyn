@@ -14,7 +14,10 @@ namespace Microsoft.CodeAnalysis.CSharp.Organizing
     [ExportLanguageService(typeof(ITriviaLogicalOwnershipAssignmentService), LanguageNames.CSharp), Shared]
     internal class CSharpTriviaLogicalOwnershipAssignmentService : ITriviaLogicalOwnershipAssignmentService
     {
-        public IEnumerable<Tuple<SyntaxTriviaList, SyntaxTriviaList>> AssignTriviaOwnership<T>(SyntaxToken previousToken, SeparatedSyntaxList<T> syntaxList, SyntaxToken nextToken) where T : SyntaxNode
+        public IEnumerable<Tuple<SyntaxTriviaList, SyntaxTriviaList>> AssignTriviaOwnership<T>(
+            SyntaxToken previousToken,
+            SeparatedSyntaxList<T> syntaxList,
+            SyntaxToken nextToken) where T : SyntaxNode
         {
             IEnumerable<SyntaxTrivia> nextTokensLeadingTrivia = previousToken.TrailingTrivia;
             for (int i = 0; i < syntaxList.Count; i++)
@@ -34,10 +37,10 @@ namespace Microsoft.CodeAnalysis.CSharp.Organizing
 
                     // And if the last node is on its own line and the next token is also on that same line, then the next token's
                     // trailing trivia also belongs to the last node.  When determining if the last node is on its own line:
-                    //   if there is only one node, it's always on its own line
+                    //   if there is only one node, it is considered to be on its own line unless the opening token is also on that line
                     //   else if there is a newline anywhere between the penultimate node and the last node
                     var isLastNodeOnOwnLine = syntaxList.Count == 1
-                        ? true
+                        ? ContainsNewLines(previousToken.TrailingTrivia) || ContainsNewLines(node.GetLeadingTrivia())
                         : ContainsNewLines(syntaxList[i - 1].GetTrailingTrivia()) ||
                           ContainsNewLines(syntaxList[i].GetLeadingTrivia()) ||
                           ContainsNewLines(syntaxList.GetSeparator(i - 1).GetAllTrivia());
@@ -88,7 +91,15 @@ namespace Microsoft.CodeAnalysis.CSharp.Organizing
             out SyntaxToken newNextToken,
             out Tuple<SyntaxTriviaList, SyntaxTriviaList> removedTrivia) where T : SyntaxNode
         {
-            // TODO: validate arguments and syntaxList.Count
+            if (syntaxList.Count == 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(syntaxList));
+            }
+
+            if (indexToRemove < 0 || indexToRemove >= syntaxList.Count)
+            {
+                throw new ArgumentOutOfRangeException(nameof(indexToRemove));
+            }
 
             newPreviousToken = previousToken;
             newNextToken = nextToken;
@@ -118,8 +129,8 @@ namespace Microsoft.CodeAnalysis.CSharp.Organizing
                 }
             }
 
-            // if removing the last item, promote the last separator's trivia to be trailing on the last item and remove it
-            if (indexToRemove == syntaxList.Count - 1)
+            // if removing the last item from a multi-item list, promote the last separator's trivia to be trailing on the last item and remove it
+            if (indexToRemove == syntaxList.Count - 1 && syntaxList.Count > 1)
             {
                 var lastSeparator = newItems.Last().AsToken();
                 newItems.RemoveAt(newItems.Count - 1);
@@ -134,13 +145,15 @@ namespace Microsoft.CodeAnalysis.CSharp.Organizing
                 newPreviousToken = previousToken.WithTrailingTrivia();
             }
 
-            var finalTrailingTrivia = newItems.Last().AsNode().GetTrailingTrivia();
-            if (finalTrailingTrivia.Count == 0 || !finalTrailingTrivia.Last().IsKind(SyntaxKind.EndOfLineTrivia))
+            var finalTrailingTrivia = newItems.LastOrDefault().AsNode()?.GetTrailingTrivia() ?? new SyntaxTriviaList();
+            if (newItems.Any() && (finalTrailingTrivia.Count == 0 || !finalTrailingTrivia.Last().IsKind(SyntaxKind.EndOfLineTrivia)))
             {
                 newItems[newItems.Count - 1] = newItems.Last().AsNode().WithAppendedTrailingTrivia(SyntaxFactory.EndOfLine(string.Empty));
             }
 
             // add trivia from the removed node to the list, unless it's only whitespace
+            var removedLeadingTrivia = new SyntaxTriviaList();
+            var removedTrailingTrivia = new SyntaxTriviaList();
             var newLeadingTrivia = triviaParts[indexToRemove].Item1
                                     //.Concat(variableDeclarator.GetLeadingTrivia())
                                     //.Concat(variableDeclarator.GetTrailingTrivia())
@@ -159,10 +172,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Organizing
                     }
                 }
 
-                //newLocalDeclaration = newLocalDeclaration.WithLeadingTrivia(newLocalDeclaration.GetLeadingTrivia().Concat(newLeadingTriviaWithNewlines));
+                removedLeadingTrivia = SyntaxFactory.TriviaList(newLeadingTriviaWithNewLines);
             }
 
-            newSyntaxList = newItems.ToSyntaxList();
+            newSyntaxList = SyntaxFactory.SeparatedList<T>(newItems);
+            removedTrivia = Tuple.Create(removedLeadingTrivia, removedTrailingTrivia);
         }
 
         private static bool ContainsNewLines(IEnumerable<SyntaxTrivia> trivia)
