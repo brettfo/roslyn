@@ -154,10 +154,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Organizing
             // add trivia from the removed node to the list, unless it's only whitespace
             var removedLeadingTrivia = new SyntaxTriviaList();
             var removedTrailingTrivia = new SyntaxTriviaList();
+            removedTrailingTrivia = triviaParts[indexToRemove].Item2;
             var newLeadingTrivia = triviaParts[indexToRemove].Item1
                                     //.Concat(variableDeclarator.GetLeadingTrivia())
                                     //.Concat(variableDeclarator.GetTrailingTrivia())
-                                    .Concat(triviaParts[indexToRemove].Item2)
+                                    //.Concat(triviaParts[indexToRemove].Item2)
                                     .ToArray();
             if (newLeadingTrivia.Any(t => !t.IsWhitespaceOrEndOfLine()))
             {
