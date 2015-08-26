@@ -277,10 +277,10 @@ namespace Roslyn.Test.Utilities
             }
         }
 
-        public static void Any<T>(IEnumerable<T> actual, Func<T, bool> predicate)
+        public static void Any<T>(IEnumerable<T> actual, Func<T, bool> predicate, Func<T, string> itemInspector = null)
         {
             var any = actual.Any(predicate);
-            Assert.True(any, string.Format("No expected item was found.\nExisting items: {0}", ToString(actual)));
+            Assert.True(any, string.Format("No expected item was found.\nExisting items: {0}", ToString(actual, itemInspector: itemInspector)));
         }
 
         public static void All<T>(IEnumerable<T> actual, Func<T, bool> predicate)

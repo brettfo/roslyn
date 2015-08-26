@@ -118,7 +118,8 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Completion
                 {
                     AssertEx.Any(items, c => CompareItems(c.DisplayText, expectedItemOrNull)
                         && (expectedDescriptionOrNull != null ? c.GetDescriptionAsync().Result.GetFullText() == expectedDescriptionOrNull : true)
-                        && (glyph.HasValue ? c.Glyph == glyph.Value : true));
+                        && (glyph.HasValue ? c.Glyph == glyph.Value : true),
+                        c => $"DisplayText='{c.DisplayText}', Description='{c.GetDescriptionAsync().Result.GetFullText()}', Glyph='{c.Glyph}' || ExpectedDisplayText='{expectedItemOrNull}', ExpectedDescription='{expectedDescriptionOrNull}', ExpectedGlyph='{glyph}'");
                 }
             }
         }
