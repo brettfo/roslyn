@@ -1,7 +1,5 @@
 ﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 
@@ -28,40 +26,40 @@ namespace Microsoft.CodeAnalysis.FindSymbols
     internal struct DeclaredSymbolInfo
     {
         public string Name { get; }
+        public string DisplayName { get; }
         public string ContainerDisplayName { get; }
         public string FullyQualifiedContainerName { get; }
         public DeclaredSymbolInfoKind Kind { get; }
+        public Accessibility Accessibility { get; }
         public TextSpan Span { get; }
         public ushort ParameterCount { get; }
         public ushort TypeParameterCount { get; }
 
-        public DeclaredSymbolInfo(string name, string containerDisplayName, string fullyQualifiedContainerName, DeclaredSymbolInfoKind kind, TextSpan span, ushort parameterCount = 0, ushort typeParameterCount = 0)
+        public DeclaredSymbolInfo(string name, string displayName, string containerDisplayName, string fullyQualifiedContainerName, DeclaredSymbolInfoKind kind, Accessibility accessibility, TextSpan span, ushort parameterCount = 0, ushort typeParameterCount = 0)
             : this()
         {
             Name = name;
+            DisplayName = displayName;
             ContainerDisplayName = containerDisplayName;
             FullyQualifiedContainerName = fullyQualifiedContainerName;
             Kind = kind;
+            Accessibility = accessibility;
             Span = span;
             ParameterCount = parameterCount;
             TypeParameterCount = typeParameterCount;
         }
 
-        public async Task<ISymbol> GetSymbolAsync(Document document, CancellationToken cancellationToken)
-        {
-            var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
-            var node = root.FindNode(Span);
-            var semanticModel = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
-            var symbol = semanticModel.GetDeclaredSymbol(node, cancellationToken);
-            return symbol;
-        }
-
         internal void WriteTo(ObjectWriter writer)
         {
             writer.WriteString(Name);
+            writer.WriteString(DisplayName);
             writer.WriteString(ContainerDisplayName);
             writer.WriteString(FullyQualifiedContainerName);
-            writer.WriteByte((byte)Kind);
+
+            // DeclaredSymbolInfoKind only has 14 members and Accessibility only has 7, so they can each be represented in 4 bits
+            var kindAndAcc = (int)Kind << 4 | (int)Accessibility;
+            writer.WriteByte((byte)kindAndAcc);
+
             writer.WriteInt32(Span.Start);
             writer.WriteInt32(Span.Length);
             writer.WriteUInt16(ParameterCount);
@@ -73,15 +71,20 @@ namespace Microsoft.CodeAnalysis.FindSymbols
             try
             {
                 var name = reader.ReadString();
+                var displayName = reader.ReadString();
                 var immediateContainer = reader.ReadString();
                 var entireContainer = reader.ReadString();
-                var kind = (DeclaredSymbolInfoKind)reader.ReadByte();
+
+                var kindAndAcc = reader.ReadByte();
+                var kind = (DeclaredSymbolInfoKind)(kindAndAcc >> 4);
+                var accessibility = (Accessibility)(kindAndAcc & 0x0F);
+
                 var spanStart = reader.ReadInt32();
                 var spanLength = reader.ReadInt32();
                 var parameterCount = reader.ReadUInt16();
                 var typeParameterCount = reader.ReadUInt16();
 
-                return new DeclaredSymbolInfo(name, immediateContainer, entireContainer, kind, new TextSpan(spanStart, spanLength), parameterCount, typeParameterCount);
+                return new DeclaredSymbolInfo(name, displayName, immediateContainer, entireContainer, kind, accessibility, new TextSpan(spanStart, spanLength), parameterCount, typeParameterCount);
             }
             catch
             {

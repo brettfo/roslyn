@@ -757,75 +757,115 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                    TypeOf node Is EnumBlockSyntax
         End Function
 
+        Private Shared Function GetAccessibility(statement As StatementSyntax) As Accessibility
+            Dim modifiers = statement.GetModifiers()
+            If modifiers.Any(Function(m) m.IsKind(SyntaxKind.PrivateKeyword)) Then
+                Return Accessibility.Private
+            ElseIf modifiers.Any(Function(m) m.IsKind(SyntaxKind.ProtectedKeyword)) Then
+                Return Accessibility.Protected
+            ElseIf modifiers.Any(Function(m) m.IsKind(SyntaxKind.FriendKeyword)) Then
+                Return Accessibility.Friend
+            End If
+
+            Return Accessibility.Public
+        End Function
+
         Public Function TryGetDeclaredSymbolInfo(node As SyntaxNode, ByRef declaredSymbolInfo As DeclaredSymbolInfo) As Boolean Implements ISyntaxFactsService.TryGetDeclaredSymbolInfo
             Select Case node.Kind()
                 Case SyntaxKind.ClassBlock
                     Dim classDecl = CType(node, ClassBlockSyntax)
-                    declaredSymbolInfo = New DeclaredSymbolInfo(classDecl.ClassStatement.Identifier.ValueText,
-                                                                GetContainerDisplayName(node.Parent),
-                                                                GetFullyQualifiedContainerName(node.Parent),
-                                                                DeclaredSymbolInfoKind.Class, classDecl.ClassStatement.Identifier.Span)
+                    declaredSymbolInfo = New DeclaredSymbolInfo(
+                        name:=classDecl.ClassStatement.Identifier.ValueText,
+                        displayName:=Nothing,
+                        containerDisplayName:=GetContainerDisplayName(node.Parent),
+                        fullyQualifiedContainerName:=GetFullyQualifiedContainerName(node.Parent),
+                        kind:=DeclaredSymbolInfoKind.Class,
+                        accessibility:=GetAccessibility(classDecl),
+                        span:=classDecl.ClassStatement.Identifier.Span)
                     Return True
                 Case SyntaxKind.ConstructorBlock
                     Dim constructor = CType(node, ConstructorBlockSyntax)
                     Dim typeBlock = TryCast(constructor.Parent, TypeBlockSyntax)
                     If typeBlock IsNot Nothing Then
                         declaredSymbolInfo = New DeclaredSymbolInfo(
-                            typeBlock.BlockStatement.Identifier.ValueText,
-                            GetContainerDisplayName(node.Parent),
-                            GetFullyQualifiedContainerName(node.Parent),
-                            DeclaredSymbolInfoKind.Constructor,
-                            constructor.SubNewStatement.NewKeyword.Span,
+                            name:=typeBlock.BlockStatement.Identifier.ValueText,
+                            displayName:=Nothing,
+                            containerDisplayName:=GetContainerDisplayName(node.Parent),
+                            fullyQualifiedContainerName:=GetFullyQualifiedContainerName(node.Parent),
+                            kind:=DeclaredSymbolInfoKind.Constructor,
+                            accessibility:=GetAccessibility(constructor),
+                            span:=constructor.SubNewStatement.NewKeyword.Span,
                             parameterCount:=CType(If(constructor.SubNewStatement.ParameterList?.Parameters.Count, 0), UShort))
-
                         Return True
                     End If
                 Case SyntaxKind.DelegateFunctionStatement, SyntaxKind.DelegateSubStatement
                     Dim delegateDecl = CType(node, DelegateStatementSyntax)
-                    declaredSymbolInfo = New DeclaredSymbolInfo(delegateDecl.Identifier.ValueText,
-                                                                GetContainerDisplayName(node.Parent),
-                                                                GetFullyQualifiedContainerName(node.Parent),
-                                                                DeclaredSymbolInfoKind.Delegate, delegateDecl.Identifier.Span)
+                    declaredSymbolInfo = New DeclaredSymbolInfo(
+                        name:=delegateDecl.Identifier.ValueText,
+                        displayName:=Nothing,
+                        containerDisplayName:=GetContainerDisplayName(node.Parent),
+                        fullyQualifiedContainerName:=GetFullyQualifiedContainerName(node.Parent),
+                        kind:=DeclaredSymbolInfoKind.Delegate,
+                        accessibility:=GetAccessibility(delegateDecl),
+                        span:=delegateDecl.Identifier.Span)
                     Return True
                 Case SyntaxKind.EnumBlock
                     Dim enumDecl = CType(node, EnumBlockSyntax)
-                    declaredSymbolInfo = New DeclaredSymbolInfo(enumDecl.EnumStatement.Identifier.ValueText,
-                                                                GetContainerDisplayName(node.Parent),
-                                                                GetFullyQualifiedContainerName(node.Parent),
-                                                                DeclaredSymbolInfoKind.Enum, enumDecl.EnumStatement.Identifier.Span)
+                    declaredSymbolInfo = New DeclaredSymbolInfo(
+                        name:=enumDecl.EnumStatement.Identifier.ValueText,
+                        displayName:=Nothing,
+                        containerDisplayName:=GetContainerDisplayName(node.Parent),
+                        fullyQualifiedContainerName:=GetFullyQualifiedContainerName(node.Parent),
+                        kind:=DeclaredSymbolInfoKind.Enum,
+                        accessibility:=GetAccessibility(enumDecl),
+                        span:=enumDecl.EnumStatement.Identifier.Span)
                     Return True
                 Case SyntaxKind.EnumMemberDeclaration
                     Dim enumMember = CType(node, EnumMemberDeclarationSyntax)
-                    declaredSymbolInfo = New DeclaredSymbolInfo(enumMember.Identifier.ValueText,
-                                                                GetContainerDisplayName(node.Parent),
-                                                                GetFullyQualifiedContainerName(node.Parent),
-                                                                DeclaredSymbolInfoKind.EnumMember, enumMember.Identifier.Span)
+                    declaredSymbolInfo = New DeclaredSymbolInfo(
+                        name:=enumMember.Identifier.ValueText,
+                        displayName:=Nothing,
+                        containerDisplayName:=GetContainerDisplayName(node.Parent),
+                        fullyQualifiedContainerName:=GetFullyQualifiedContainerName(node.Parent),
+                        kind:=DeclaredSymbolInfoKind.EnumMember,
+                        accessibility:=Accessibility.Public,
+                        span:=enumMember.Identifier.Span)
                     Return True
                 Case SyntaxKind.EventStatement
                     Dim eventDecl = CType(node, EventStatementSyntax)
                     Dim eventParent = If(TypeOf node.Parent Is EventBlockSyntax, node.Parent.Parent, node.Parent)
-                    declaredSymbolInfo = New DeclaredSymbolInfo(eventDecl.Identifier.ValueText,
-                                                                GetContainerDisplayName(eventParent),
-                                                                GetFullyQualifiedContainerName(eventParent),
-                                                                DeclaredSymbolInfoKind.Event, eventDecl.Identifier.Span)
+                    declaredSymbolInfo = New DeclaredSymbolInfo(
+                        name:=eventDecl.Identifier.ValueText,
+                        displayName:=Nothing,
+                        containerDisplayName:=GetContainerDisplayName(eventParent),
+                        fullyQualifiedContainerName:=GetFullyQualifiedContainerName(eventParent),
+                        kind:=DeclaredSymbolInfoKind.Event,
+                        accessibility:=GetAccessibility(eventDecl),
+                        span:=eventDecl.Identifier.Span)
                     Return True
                 Case SyntaxKind.FunctionBlock, SyntaxKind.SubBlock
                     Dim funcDecl = CType(node, MethodBlockSyntax)
                     declaredSymbolInfo = New DeclaredSymbolInfo(
-                        funcDecl.SubOrFunctionStatement.Identifier.ValueText,
-                        GetContainerDisplayName(node.Parent),
-                        GetFullyQualifiedContainerName(node.Parent),
-                        DeclaredSymbolInfoKind.Method,
-                        funcDecl.SubOrFunctionStatement.Identifier.Span,
+                        name:=funcDecl.SubOrFunctionStatement.Identifier.ValueText,
+                        displayName:=Nothing,
+                        containerDisplayName:=GetContainerDisplayName(node.Parent),
+                        fullyQualifiedContainerName:=GetFullyQualifiedContainerName(node.Parent),
+                        kind:=DeclaredSymbolInfoKind.Method,
+                        accessibility:=GetAccessibility(funcDecl),
+                        span:=funcDecl.SubOrFunctionStatement.Identifier.Span,
                         parameterCount:=CType(If(funcDecl.SubOrFunctionStatement.ParameterList?.Parameters.Count, 0), UShort),
                         typeParameterCount:=CType(If(funcDecl.SubOrFunctionStatement.TypeParameterList?.Parameters.Count, 0), UShort))
                     Return True
                 Case SyntaxKind.InterfaceBlock
                     Dim interfaceDecl = CType(node, InterfaceBlockSyntax)
-                    declaredSymbolInfo = New DeclaredSymbolInfo(interfaceDecl.InterfaceStatement.Identifier.ValueText,
-                                                                GetContainerDisplayName(node.Parent),
-                                                                GetFullyQualifiedContainerName(node.Parent),
-                                                                DeclaredSymbolInfoKind.Interface, interfaceDecl.InterfaceStatement.Identifier.Span)
+                    declaredSymbolInfo = New DeclaredSymbolInfo(
+                        name:=interfaceDecl.InterfaceStatement.Identifier.ValueText,
+                        displayName:=Nothing,
+                        containerDisplayName:=GetContainerDisplayName(node.Parent),
+                        fullyQualifiedContainerName:=GetFullyQualifiedContainerName(node.Parent),
+                        kind:=DeclaredSymbolInfoKind.Interface,
+                        accessibility:=GetAccessibility(interfaceDecl),
+                        span:=interfaceDecl.InterfaceStatement.Identifier.Span)
                     Return True
                 Case SyntaxKind.ModifiedIdentifier
                     Dim modifiedIdentifier = CType(node, ModifiedIdentifierSyntax)
@@ -835,38 +875,58 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                         Dim kind = If(fieldDecl.Modifiers.Any(Function(m) m.Kind() = SyntaxKind.ConstKeyword),
                             DeclaredSymbolInfoKind.Constant,
                             DeclaredSymbolInfoKind.Field)
-                        declaredSymbolInfo = New DeclaredSymbolInfo(modifiedIdentifier.Identifier.ValueText,
-                                                                    GetContainerDisplayName(fieldDecl.Parent),
-                                                                    GetFullyQualifiedContainerName(fieldDecl.Parent),
-                                                                    kind, modifiedIdentifier.Identifier.Span)
+                        declaredSymbolInfo = New DeclaredSymbolInfo(
+                            name:=modifiedIdentifier.Identifier.ValueText,
+                            displayName:=Nothing,
+                            containerDisplayName:=GetContainerDisplayName(fieldDecl.Parent),
+                            fullyQualifiedContainerName:=GetFullyQualifiedContainerName(fieldDecl.Parent),
+                            kind:=kind,
+                            accessibility:=GetAccessibility(fieldDecl),
+                            span:=modifiedIdentifier.Identifier.Span)
                         Return True
                     End If
                 Case SyntaxKind.ModuleBlock
                     Dim moduleDecl = CType(node, ModuleBlockSyntax)
-                    declaredSymbolInfo = New DeclaredSymbolInfo(moduleDecl.ModuleStatement.Identifier.ValueText,
-                                                                GetContainerDisplayName(node.Parent),
-                                                                GetFullyQualifiedContainerName(node.Parent),
-                                                                DeclaredSymbolInfoKind.Module, moduleDecl.ModuleStatement.Identifier.Span)
+                    declaredSymbolInfo = New DeclaredSymbolInfo(
+                        name:=moduleDecl.ModuleStatement.Identifier.ValueText,
+                        displayName:=Nothing,
+                        containerDisplayName:=GetContainerDisplayName(node.Parent),
+                        fullyQualifiedContainerName:=GetFullyQualifiedContainerName(node.Parent),
+                        kind:=DeclaredSymbolInfoKind.Module,
+                        accessibility:=GetAccessibility(moduleDecl),
+                        span:=moduleDecl.ModuleStatement.Identifier.Span)
                     Return True
                 Case SyntaxKind.PropertyStatement
                     Dim propertyDecl = CType(node, PropertyStatementSyntax)
                     Dim propertyParent = If(TypeOf node.Parent Is PropertyBlockSyntax, node.Parent.Parent, node.Parent)
-                    declaredSymbolInfo = New DeclaredSymbolInfo(propertyDecl.Identifier.ValueText,
-                                                                GetContainerDisplayName(propertyParent),
-                                                                GetFullyQualifiedContainerName(propertyParent),
-                                                                DeclaredSymbolInfoKind.Property, propertyDecl.Identifier.Span)
+                    declaredSymbolInfo = New DeclaredSymbolInfo(
+                        name:=propertyDecl.Identifier.ValueText,
+                        displayName:=Nothing,
+                        containerDisplayName:=GetContainerDisplayName(propertyParent),
+                        fullyQualifiedContainerName:=GetFullyQualifiedContainerName(propertyParent),
+                        kind:=DeclaredSymbolInfoKind.Property,
+                        accessibility:=GetAccessibility(propertyDecl),
+                        span:=propertyDecl.Identifier.Span)
                     Return True
                 Case SyntaxKind.StructureBlock
                     Dim structDecl = CType(node, StructureBlockSyntax)
-                    declaredSymbolInfo = New DeclaredSymbolInfo(structDecl.StructureStatement.Identifier.ValueText,
-                                                                GetContainerDisplayName(node.Parent),
-                                                                GetFullyQualifiedContainerName(node.Parent),
-                                                                DeclaredSymbolInfoKind.Struct, structDecl.StructureStatement.Identifier.Span)
+                    declaredSymbolInfo = New DeclaredSymbolInfo(
+                        name:=structDecl.StructureStatement.Identifier.ValueText,
+                        displayName:=Nothing,
+                        containerDisplayName:=GetContainerDisplayName(node.Parent),
+                        fullyQualifiedContainerName:=GetFullyQualifiedContainerName(node.Parent),
+                        kind:=DeclaredSymbolInfoKind.Struct,
+                        accessibility:=GetAccessibility(structDecl),
+                        span:=structDecl.StructureStatement.Identifier.Span)
                     Return True
             End Select
 
             declaredSymbolInfo = Nothing
             Return False
+        End Function
+
+        Private Function GetDisplayName(node As SyntaxNode) As String
+            Return GetDisplayName(node, DisplayNameOptions.IncludeParameters Or DisplayNameOptions.IncludeTypeParameters, False)
         End Function
 
         Private Function GetContainerDisplayName(node As SyntaxNode) As String
@@ -880,6 +940,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Private Const s_dotToken As String = "."
 
         Public Function GetDisplayName(node As SyntaxNode, options As DisplayNameOptions, Optional rootNamespace As String = Nothing) As String Implements ISyntaxFactsService.GetDisplayName
+            Return GetDisplayName(node, options, True, rootNamespace)
+        End Function
+
+        Private Function GetDisplayName(node As SyntaxNode, options As DisplayNameOptions, navigateUpNames As Boolean, Optional rootNamespace As String = Nothing) As String
             If node Is Nothing Then
                 Return String.Empty
             End If
@@ -900,7 +964,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim names = ArrayBuilder(Of String).GetInstance()
             ' containing type(s)
             Dim parent = node.Parent
-            While TypeOf parent Is TypeBlockSyntax
+            While TypeOf parent Is TypeBlockSyntax OrElse TypeOf parent Is EnumBlockSyntax
                 names.Push(GetName(parent, options, containsGlobalKeyword:=False))
                 parent = parent.Parent
             End While

@@ -4,7 +4,6 @@ using System;
 using System.Diagnostics;
 using Microsoft.CodeAnalysis.Editor.Navigation;
 using Microsoft.CodeAnalysis.FindSymbols;
-using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.VisualStudio.Language.NavigateTo.Interfaces;
 
 namespace Microsoft.CodeAnalysis.Editor.Implementation.NavigateTo
@@ -13,9 +12,9 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.NavigateTo
     {
         private class SearchResult : INavigateToSearchResult
         {
-            public string AdditionalInformation => _lazyAdditionalInfo.Value;
+            public string AdditionalInformation { get; }
             public string Name => _declaredSymbolInfo.Name;
-            public string Summary => _lazySummary.Value;
+            public string Summary => "TODO: summary"; // declaredNavigableItem.Symbol?.GetDocumentationComment()?.SummaryText);
 
             public string Kind { get; }
             public MatchKind MatchKind { get; }
@@ -25,8 +24,6 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.NavigateTo
 
             private Document _document;
             private DeclaredSymbolInfo _declaredSymbolInfo;
-            private Lazy<string> _lazyAdditionalInfo;
-            private Lazy<string> _lazySummary;
 
             public SearchResult(Document document, DeclaredSymbolInfo declaredSymbolInfo, string kind, MatchKind matchKind, bool isCaseSensitive, INavigableItem navigableItem)
             {
@@ -41,21 +38,19 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.NavigateTo
                 var declaredNavigableItem = navigableItem as NavigableItemFactory.DeclaredSymbolNavigableItem;
                 Debug.Assert(declaredNavigableItem != null);
 
-                _lazySummary = new Lazy<string>(() => declaredNavigableItem.Symbol?.GetDocumentationComment()?.SummaryText);
-                _lazyAdditionalInfo = new Lazy<string>(() =>
+                switch (declaredSymbolInfo.Kind)
                 {
-                    switch (declaredSymbolInfo.Kind)
-                    {
-                        case DeclaredSymbolInfoKind.Class:
-                        case DeclaredSymbolInfoKind.Enum:
-                        case DeclaredSymbolInfoKind.Interface:
-                        case DeclaredSymbolInfoKind.Module:
-                        case DeclaredSymbolInfoKind.Struct:
-                            return EditorFeaturesResources.Project + document.Project.Name;
-                        default:
-                            return EditorFeaturesResources.Type + declaredSymbolInfo.ContainerDisplayName;
-                    }
-                });
+                    case DeclaredSymbolInfoKind.Class:
+                    case DeclaredSymbolInfoKind.Enum:
+                    case DeclaredSymbolInfoKind.Interface:
+                    case DeclaredSymbolInfoKind.Module:
+                    case DeclaredSymbolInfoKind.Struct:
+                        AdditionalInformation = EditorFeaturesResources.Project + document.Project.Name;
+                        break;
+                    default:
+                        AdditionalInformation = EditorFeaturesResources.Type + declaredSymbolInfo.ContainerDisplayName;
+                        break;
+                }
             }
 
             private static string ConstructSecondarySortString(DeclaredSymbolInfo declaredSymbolInfo)

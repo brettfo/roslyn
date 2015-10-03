@@ -738,93 +738,147 @@ namespace Microsoft.CodeAnalysis.CSharp
                    node is EnumDeclarationSyntax;
         }
 
+        private static Accessibility GetAccessibility(SyntaxNode node)
+        {
+            var modifiers = node.GetModifiers();
+            if (modifiers.Any(SyntaxKind.PrivateKeyword))
+                return Accessibility.Private;
+            else if (modifiers.Any(SyntaxKind.ProtectedKeyword))
+                return Accessibility.Protected;
+            else if (modifiers.Any(SyntaxKind.InternalKeyword))
+                return Accessibility.Internal;
+            else if (modifiers.Any(SyntaxKind.PublicKeyword))
+                return Accessibility.Public;
+            return Accessibility.Private;
+        }
+
         public bool TryGetDeclaredSymbolInfo(SyntaxNode node, out DeclaredSymbolInfo declaredSymbolInfo)
         {
             switch (node.Kind())
             {
                 case SyntaxKind.ClassDeclaration:
                     var classDecl = (ClassDeclarationSyntax)node;
-                    declaredSymbolInfo = new DeclaredSymbolInfo(classDecl.Identifier.ValueText,
-                        GetContainerDisplayName(node.Parent),
-                        GetFullyQualifiedContainerName(node.Parent),
-                        DeclaredSymbolInfoKind.Class, classDecl.Identifier.Span);
+                    declaredSymbolInfo = new DeclaredSymbolInfo(
+                        name: classDecl.Identifier.ValueText,
+                        displayName: GetDisplayName(node),
+                        containerDisplayName: null, // its container is the parent project and is computed later from the document
+                        fullyQualifiedContainerName: GetFullyQualifiedContainerName(node.Parent),
+                        kind: DeclaredSymbolInfoKind.Class,
+                        accessibility: GetAccessibility(node),
+                        span: classDecl.Identifier.Span);
                     return true;
                 case SyntaxKind.ConstructorDeclaration:
                     var ctorDecl = (ConstructorDeclarationSyntax)node;
                     declaredSymbolInfo = new DeclaredSymbolInfo(
-                        ctorDecl.Identifier.ValueText,
-                        GetContainerDisplayName(node.Parent),
-                        GetFullyQualifiedContainerName(node.Parent),
-                        DeclaredSymbolInfoKind.Constructor,
-                        ctorDecl.Identifier.Span,
+                        name: ctorDecl.Identifier.ValueText,
+                        displayName: GetDisplayName(node),
+                        containerDisplayName: GetContainerDisplayName(node.Parent),
+                        fullyQualifiedContainerName: GetFullyQualifiedContainerName(node.Parent),
+                        kind: DeclaredSymbolInfoKind.Constructor,
+                        accessibility: GetAccessibility(node),
+                        span: ctorDecl.Identifier.Span,
                         parameterCount: (ushort)(ctorDecl.ParameterList?.Parameters.Count ?? 0));
                     return true;
                 case SyntaxKind.DelegateDeclaration:
                     var delegateDecl = (DelegateDeclarationSyntax)node;
-                    declaredSymbolInfo = new DeclaredSymbolInfo(delegateDecl.Identifier.ValueText,
-                        GetContainerDisplayName(node.Parent),
-                        GetFullyQualifiedContainerName(node.Parent),
-                        DeclaredSymbolInfoKind.Delegate, delegateDecl.Identifier.Span);
+                    declaredSymbolInfo = new DeclaredSymbolInfo(
+                        name: delegateDecl.Identifier.ValueText,
+                        displayName: GetDisplayName(node),
+                        containerDisplayName: GetContainerDisplayName(node.Parent),
+                        fullyQualifiedContainerName: GetFullyQualifiedContainerName(node.Parent),
+                        kind: DeclaredSymbolInfoKind.Delegate,
+                        accessibility: GetAccessibility(node),
+                        span: delegateDecl.Identifier.Span);
                     return true;
                 case SyntaxKind.EnumDeclaration:
                     var enumDecl = (EnumDeclarationSyntax)node;
-                    declaredSymbolInfo = new DeclaredSymbolInfo(enumDecl.Identifier.ValueText,
-                        GetContainerDisplayName(node.Parent),
-                        GetFullyQualifiedContainerName(node.Parent),
-                        DeclaredSymbolInfoKind.Enum, enumDecl.Identifier.Span);
+                    declaredSymbolInfo = new DeclaredSymbolInfo(
+                        name: enumDecl.Identifier.ValueText,
+                        displayName: GetDisplayName(node),
+                        containerDisplayName: null, // its container is the parent project and is computed later from the document
+                        fullyQualifiedContainerName: GetFullyQualifiedContainerName(node.Parent),
+                        kind: DeclaredSymbolInfoKind.Enum,
+                        accessibility: GetAccessibility(node),
+                        span: enumDecl.Identifier.Span);
                     return true;
                 case SyntaxKind.EnumMemberDeclaration:
                     var enumMember = (EnumMemberDeclarationSyntax)node;
-                    declaredSymbolInfo = new DeclaredSymbolInfo(enumMember.Identifier.ValueText,
-                        GetContainerDisplayName(node.Parent),
-                        GetFullyQualifiedContainerName(node.Parent),
-                        DeclaredSymbolInfoKind.EnumMember, enumMember.Identifier.Span);
+                    declaredSymbolInfo = new DeclaredSymbolInfo(
+                        name: enumMember.Identifier.ValueText,
+                        displayName: GetDisplayName(node),
+                        containerDisplayName: GetContainerDisplayName(node.Parent),
+                        fullyQualifiedContainerName: GetFullyQualifiedContainerName(node.Parent),
+                        kind: DeclaredSymbolInfoKind.EnumMember,
+                        accessibility: Accessibility.Public,
+                        span: enumMember.Identifier.Span);
                     return true;
                 case SyntaxKind.EventDeclaration:
                     var eventDecl = (EventDeclarationSyntax)node;
-                    declaredSymbolInfo = new DeclaredSymbolInfo(ExpandExplicitInterfaceName(eventDecl.Identifier.ValueText, eventDecl.ExplicitInterfaceSpecifier),
-                        GetContainerDisplayName(node.Parent),
-                        GetFullyQualifiedContainerName(node.Parent),
-                        DeclaredSymbolInfoKind.Event, eventDecl.Identifier.Span);
+                    declaredSymbolInfo = new DeclaredSymbolInfo(
+                        name: ExpandExplicitInterfaceName(eventDecl.Identifier.ValueText, eventDecl.ExplicitInterfaceSpecifier),
+                        displayName: GetDisplayName(node),
+                        containerDisplayName: GetContainerDisplayName(node.Parent),
+                        fullyQualifiedContainerName: GetFullyQualifiedContainerName(node.Parent),
+                        kind: DeclaredSymbolInfoKind.Event,
+                        accessibility: GetAccessibility(node),
+                        span: eventDecl.Identifier.Span);
                     return true;
                 case SyntaxKind.IndexerDeclaration:
                     var indexerDecl = (IndexerDeclarationSyntax)node;
-                    declaredSymbolInfo = new DeclaredSymbolInfo(WellKnownMemberNames.Indexer,
-                        GetContainerDisplayName(node.Parent),
-                        GetFullyQualifiedContainerName(node.Parent),
-                        DeclaredSymbolInfoKind.Indexer, indexerDecl.ThisKeyword.Span);
+                    declaredSymbolInfo = new DeclaredSymbolInfo(
+                        name: WellKnownMemberNames.Indexer,
+                        displayName: GetDisplayName(node),
+                        containerDisplayName: GetContainerDisplayName(node.Parent),
+                        fullyQualifiedContainerName: GetFullyQualifiedContainerName(node.Parent),
+                        kind: DeclaredSymbolInfoKind.Indexer,
+                        accessibility: GetAccessibility(node),
+                        span: indexerDecl.ThisKeyword.Span);
                     return true;
                 case SyntaxKind.InterfaceDeclaration:
                     var interfaceDecl = (InterfaceDeclarationSyntax)node;
-                    declaredSymbolInfo = new DeclaredSymbolInfo(interfaceDecl.Identifier.ValueText,
-                        GetContainerDisplayName(node.Parent),
-                        GetFullyQualifiedContainerName(node.Parent),
-                        DeclaredSymbolInfoKind.Interface, interfaceDecl.Identifier.Span);
+                    declaredSymbolInfo = new DeclaredSymbolInfo(
+                        name: interfaceDecl.Identifier.ValueText,
+                        displayName: GetDisplayName(node),
+                        containerDisplayName: null, // its container is the parent project and is computed later from the document
+                        fullyQualifiedContainerName: GetFullyQualifiedContainerName(node.Parent),
+                        kind: DeclaredSymbolInfoKind.Interface,
+                        accessibility: GetAccessibility(node),
+                        span: interfaceDecl.Identifier.Span);
                     return true;
                 case SyntaxKind.MethodDeclaration:
                     var method = (MethodDeclarationSyntax)node;
                     declaredSymbolInfo = new DeclaredSymbolInfo(
-                        ExpandExplicitInterfaceName(method.Identifier.ValueText, method.ExplicitInterfaceSpecifier),
-                        GetContainerDisplayName(node.Parent),
-                        GetFullyQualifiedContainerName(node.Parent),
-                        DeclaredSymbolInfoKind.Method,
-                        method.Identifier.Span,
+                        name: ExpandExplicitInterfaceName(method.Identifier.ValueText, method.ExplicitInterfaceSpecifier),
+                        displayName: GetDisplayName(node),
+                        containerDisplayName: GetContainerDisplayName(node.Parent),
+                        fullyQualifiedContainerName: GetFullyQualifiedContainerName(node.Parent),
+                        kind: DeclaredSymbolInfoKind.Method,
+                        accessibility: GetAccessibility(node),
+                        span: method.Identifier.Span,
                         parameterCount: (ushort)(method.ParameterList?.Parameters.Count ?? 0),
                         typeParameterCount: (ushort)(method.TypeParameterList?.Parameters.Count ?? 0));
                     return true;
                 case SyntaxKind.PropertyDeclaration:
                     var property = (PropertyDeclarationSyntax)node;
-                    declaredSymbolInfo = new DeclaredSymbolInfo(ExpandExplicitInterfaceName(property.Identifier.ValueText, property.ExplicitInterfaceSpecifier),
-                        GetContainerDisplayName(node.Parent),
-                        GetFullyQualifiedContainerName(node.Parent),
-                        DeclaredSymbolInfoKind.Property, property.Identifier.Span);
+                    declaredSymbolInfo = new DeclaredSymbolInfo(
+                        name: ExpandExplicitInterfaceName(property.Identifier.ValueText, property.ExplicitInterfaceSpecifier),
+                        displayName: GetDisplayName(node),
+                        containerDisplayName: GetContainerDisplayName(node.Parent),
+                        fullyQualifiedContainerName: GetFullyQualifiedContainerName(node.Parent),
+                        kind: DeclaredSymbolInfoKind.Property,
+                        accessibility: GetAccessibility(node),
+                        span: property.Identifier.Span);
                     return true;
                 case SyntaxKind.StructDeclaration:
                     var structDecl = (StructDeclarationSyntax)node;
-                    declaredSymbolInfo = new DeclaredSymbolInfo(structDecl.Identifier.ValueText,
-                        GetContainerDisplayName(node.Parent),
-                        GetFullyQualifiedContainerName(node.Parent),
-                        DeclaredSymbolInfoKind.Struct, structDecl.Identifier.Span);
+                    declaredSymbolInfo = new DeclaredSymbolInfo(
+                        name: structDecl.Identifier.ValueText,
+                        displayName: GetDisplayName(node),
+                        containerDisplayName: null, // its container is the parent project and is computed later from the document
+                        fullyQualifiedContainerName: GetFullyQualifiedContainerName(node.Parent),
+                        kind: DeclaredSymbolInfoKind.Struct,
+                        accessibility: GetAccessibility(node),
+                        span: structDecl.Identifier.Span);
                     return true;
                 case SyntaxKind.VariableDeclarator:
                     // could either be part of a field declaration or an event field declaration
@@ -839,10 +893,14 @@ namespace Microsoft.CodeAnalysis.CSharp
                                 ? DeclaredSymbolInfoKind.Constant
                                 : DeclaredSymbolInfoKind.Field;
 
-                        declaredSymbolInfo = new DeclaredSymbolInfo(variableDeclarator.Identifier.ValueText,
-                        GetContainerDisplayName(fieldDeclaration.Parent),
-                        GetFullyQualifiedContainerName(fieldDeclaration.Parent),
-                        kind, variableDeclarator.Identifier.Span);
+                        declaredSymbolInfo = new DeclaredSymbolInfo(
+                            name: variableDeclarator.Identifier.ValueText,
+                            displayName: GetDisplayName(node),
+                            containerDisplayName: GetContainerDisplayName(fieldDeclaration.Parent),
+                            fullyQualifiedContainerName: GetFullyQualifiedContainerName(fieldDeclaration.Parent),
+                            kind: kind,
+                            accessibility: GetAccessibility(node),
+                            span: variableDeclarator.Identifier.Span);
                         return true;
                     }
 
@@ -947,6 +1005,11 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
+        private string GetDisplayName(SyntaxNode node)
+        {
+            return GetDisplayName(node, DisplayNameOptions.IncludeParameters | DisplayNameOptions.IncludeTypeParameters, false);
+        }
+
         private string GetContainerDisplayName(SyntaxNode node)
         {
             return GetDisplayName(node, DisplayNameOptions.IncludeTypeParameters);
@@ -960,6 +1023,11 @@ namespace Microsoft.CodeAnalysis.CSharp
         private const string dotToken = ".";
 
         public string GetDisplayName(SyntaxNode node, DisplayNameOptions options, string rootNamespace = null)
+        {
+            return GetDisplayName(node, options, true, rootNamespace);
+        }
+
+        private string GetDisplayName(SyntaxNode node, DisplayNameOptions options, bool navigateUpName, string rootNamespace = null)
         {
             if (node == null)
             {
@@ -981,30 +1049,33 @@ namespace Microsoft.CodeAnalysis.CSharp
                 }
             }
 
-            var names = ArrayBuilder<string>.GetInstance();
-            // containing type(s)
-            var parent = node.GetAncestor<TypeDeclarationSyntax>() ?? node.Parent;
-            while (parent is TypeDeclarationSyntax)
+            if (navigateUpName)
             {
-                names.Push(GetName(parent, options));
-                parent = parent.Parent;
-            }
-            // containing namespace(s) in source (if any)
-            if ((options & DisplayNameOptions.IncludeNamespaces) != 0)
-            {
-                while (parent != null && parent.Kind() == SyntaxKind.NamespaceDeclaration)
+                var names = ArrayBuilder<string>.GetInstance();
+                // containing type(s)
+                var parent = node.GetAncestor<TypeDeclarationSyntax>() ?? node.Parent;
+                while (parent is TypeDeclarationSyntax || parent is EnumDeclarationSyntax)
                 {
-                    names.Add(GetName(parent, options));
+                    names.Push(GetName(parent, options));
                     parent = parent.Parent;
                 }
-            }
-            while (!names.IsEmpty())
-            {
-                var name = names.Pop();
-                if (name != null)
+                // containing namespace(s) in source (if any)
+                if ((options & DisplayNameOptions.IncludeNamespaces) != 0)
                 {
-                    builder.Append(name);
-                    builder.Append(dotToken);
+                    while (parent != null && parent.Kind() == SyntaxKind.NamespaceDeclaration)
+                    {
+                        names.Add(GetName(parent, options));
+                        parent = parent.Parent;
+                    }
+                }
+                while (!names.IsEmpty())
+                {
+                    var name = names.Pop();
+                    if (name != null)
+                    {
+                        builder.Append(name);
+                        builder.Append(dotToken);
+                    }
                 }
             }
 

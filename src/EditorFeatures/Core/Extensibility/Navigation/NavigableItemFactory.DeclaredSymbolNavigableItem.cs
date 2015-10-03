@@ -2,12 +2,8 @@
 
 using System;
 using System.Collections.Immutable;
-using System.Threading;
-using Microsoft.CodeAnalysis.ErrorReporting;
 using Microsoft.CodeAnalysis.FindSymbols;
-using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
-using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Editor.Navigation
 {
@@ -15,43 +11,72 @@ namespace Microsoft.CodeAnalysis.Editor.Navigation
     {
         internal class DeclaredSymbolNavigableItem : INavigableItem
         {
-            public string DisplayString => _lazyDisplayString.Value;
+            public string DisplayString => _declaredSymbolInfo.DisplayName;
             public Document Document { get; }
-            public Glyph Glyph => _lazySymbol.Value?.GetGlyph() ?? Glyph.Error;
+            public Glyph Glyph => GetGlyph(_declaredSymbolInfo);
             public TextSpan SourceSpan => _declaredSymbolInfo.Span;
-            public ISymbol Symbol => _lazySymbol.Value;
             public ImmutableArray<INavigableItem> ChildItems => ImmutableArray<INavigableItem>.Empty;
 
             public bool DisplayFileLocation => false;
 
             private readonly DeclaredSymbolInfo _declaredSymbolInfo;
-            private readonly Lazy<string> _lazyDisplayString;
-            private readonly Lazy<ISymbol> _lazySymbol;
 
             public DeclaredSymbolNavigableItem(Document document, DeclaredSymbolInfo declaredSymbolInfo)
             {
                 Document = document;
                 _declaredSymbolInfo = declaredSymbolInfo;
+            }
 
-                // Cancellation isn't supported when computing the various properties that depend on the symbol, hence
-                // CancellationToken.None.
-                _lazySymbol = new Lazy<ISymbol>(() => declaredSymbolInfo.GetSymbolAsync(document, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult());
-                _lazyDisplayString = new Lazy<string>(() =>
+            private static Glyph GetGlyph(DeclaredSymbolInfo declaredSymbolInfo)
+            {
+                switch (declaredSymbolInfo.Kind)
                 {
-                    try
-                    {
-                        if (Symbol == null)
-                        {
-                            return null;
-                        }
+                    case DeclaredSymbolInfoKind.Class:
+                        return GetGlyphFromAccessibility(declaredSymbolInfo.Accessibility, Glyph.ClassPrivate, Glyph.ClassProtected, Glyph.ClassInternal, Glyph.ClassPublic);
+                    case DeclaredSymbolInfoKind.Constant:
+                        return GetGlyphFromAccessibility(declaredSymbolInfo.Accessibility, Glyph.ConstantPrivate, Glyph.ConstantProtected, Glyph.ConstantInternal, Glyph.ConstantPublic);
+                    case DeclaredSymbolInfoKind.Constructor:
+                    case DeclaredSymbolInfoKind.Method:
+                        return GetGlyphFromAccessibility(declaredSymbolInfo.Accessibility, Glyph.MethodPrivate, Glyph.MethodProtected, Glyph.MethodInternal, Glyph.MethodPublic);
+                    case DeclaredSymbolInfoKind.Delegate:
+                        return GetGlyphFromAccessibility(declaredSymbolInfo.Accessibility, Glyph.DelegatePrivate, Glyph.DelegateProtected, Glyph.DelegateInternal, Glyph.DelegatePublic);
+                    case DeclaredSymbolInfoKind.Enum:
+                        return GetGlyphFromAccessibility(declaredSymbolInfo.Accessibility, Glyph.EnumPrivate, Glyph.EnumProtected, Glyph.EnumInternal, Glyph.EnumPublic);
+                    case DeclaredSymbolInfoKind.EnumMember:
+                        return Glyph.EnumMember;
+                    case DeclaredSymbolInfoKind.Event:
+                        return GetGlyphFromAccessibility(declaredSymbolInfo.Accessibility, Glyph.EventPrivate, Glyph.EventProtected, Glyph.EventInternal, Glyph.EventPublic);
+                    case DeclaredSymbolInfoKind.Field:
+                        return GetGlyphFromAccessibility(declaredSymbolInfo.Accessibility, Glyph.FieldPrivate, Glyph.FieldProtected, Glyph.FieldInternal, Glyph.FieldPublic);
+                    case DeclaredSymbolInfoKind.Interface:
+                        return GetGlyphFromAccessibility(declaredSymbolInfo.Accessibility, Glyph.InterfacePrivate, Glyph.InterfaceProtected, Glyph.InterfaceInternal, Glyph.InterfacePublic);
+                    case DeclaredSymbolInfoKind.Module:
+                        return GetGlyphFromAccessibility(declaredSymbolInfo.Accessibility, Glyph.ModulePrivate, Glyph.ModuleProtected, Glyph.ModuleInternal, Glyph.ModulePublic);
+                    case DeclaredSymbolInfoKind.Indexer:
+                    case DeclaredSymbolInfoKind.Property:
+                        return GetGlyphFromAccessibility(declaredSymbolInfo.Accessibility, Glyph.PropertyPrivate, Glyph.PropertyProtected, Glyph.PropertyInternal, Glyph.PropertyPublic);
+                    case DeclaredSymbolInfoKind.Struct:
+                        return GetGlyphFromAccessibility(declaredSymbolInfo.Accessibility, Glyph.StructurePrivate, Glyph.StructureProtected, Glyph.StructureInternal, Glyph.StructurePublic);
+                    default:
+                        return Glyph.Error;
+                }
+            }
 
-                        return GetSymbolDisplayString(Document.Project, Symbol);
-                    }
-                    catch (Exception e) when (FatalError.Report(e))
-                    {
-                        throw ExceptionUtilities.Unreachable;
-                    }
-                });
+            private static Glyph GetGlyphFromAccessibility(Accessibility accessibility, Glyph privateGlyph, Glyph protectedGlyph, Glyph internalGlyph, Glyph publicGlyph)
+            {
+                switch (accessibility)
+                {
+                    case Accessibility.Private:
+                        return privateGlyph;
+                    case Accessibility.Protected:
+                        return protectedGlyph;
+                    case Accessibility.Internal:
+                        return internalGlyph;
+                    case Accessibility.Public:
+                        return publicGlyph;
+                    default:
+                        throw new ArgumentException(nameof(accessibility));
+                }
             }
         }
     }
