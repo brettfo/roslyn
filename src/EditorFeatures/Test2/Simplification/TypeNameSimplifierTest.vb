@@ -2451,6 +2451,43 @@ class C
 
             Await TestAsync(input, expected)
         End Function
+
+        <WorkItem(7065, "https://github.com/dotnet/roslyn/issues/7065")>
+        <Fact, Trait(Traits.Feature, Traits.Features.Simplification)>
+        Public Async Function QualifyFieldAccessWithThis_1_CSharp() As Task
+            Dim input =
+        <Workspace>
+            <Project Language="C#" CommonReferences="true">
+                <Document>
+                    <![CDATA[
+class C
+{
+    int i;
+    void M()
+    {
+        {|Simplify:i|} = 1;
+    }
+}
+]]>
+                </Document>
+            </Project>
+        </Workspace>
+
+            Dim expected =
+              <text>
+                  <![CDATA[
+class C
+{
+    int i;
+    void M()
+    {
+        this.i = 1;
+    }
+}
+]]></text>
+            Dim simplificationOptionSet = New Dictionary(Of OptionKey, Object) From {{New OptionKey(SimplificationOptions.QualifyMemberFieldAccessWithThisOrMe, LanguageNames.CSharp), True}}
+            Await TestAsync(input, expected, simplificationOptionSet)
+        End Function
 #End Region
 
 #Region "Normal Visual Basic Tests"
